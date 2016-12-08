@@ -7,45 +7,47 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 
+#include "device_util.cuh"
 #include "kernel_impl.cuh"
 
 namespace params_d {
-__constant__ int32_t grid_numb[3];
-__constant__ Dtype inv_grid_leng[3];
+__constant__ int32_t cell_numb[3];
+__constant__ Dtype inv_cell_leng[3];
 }
 
 __host__ __device__ __forceinline__
 int32_t gen_hash(const int32_t* idx,
-                 const int32_t* grid_numb) {
-  return idx[0] + (idx[1] + idx[2] * grid_numb[1]) * grid_numb[0];
+                 const int32_t* cell_numb) {
+  return idx[0] + (idx[1] + idx[2] * cell_numb[1]) * cell_numb[0];
 }
 
 template <typename Vec>
-__global__ void gen_grid_id(const Vec* q,
-                            int32_t* grid_id_of_ptcl,
+__global__ void gen_cell_id(const Vec* q,
+                            int32_t* cell_id_of_ptcl,
                             const int32_t particle_number) {
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < particle_number) {
     const auto qi = q[tid];
-    int32_t idx[] = { static_cast<int32_t>(qi.x * params_d::inv_grid_leng[0]),
-                      static_cast<int32_t>(qi.y * params_d::inv_grid_leng[1]),
-                      static_cast<int32_t>(qi.z * params_d::inv_grid_leng[2]) };
-    if (idx[0] == params_d::grid_numb[0]) idx[0]--;
-    if (idx[1] == params_d::grid_numb[1]) idx[1]--;
-    if (idx[2] == params_d::grid_numb[2]) idx[2]--;
-    grid_id_of_ptcl[tid] = gen_hash(idx, params_d::grid_numb);
+    int32_t idx[] = { static_cast<int32_t>(qi.x * params_d::inv_cell_leng[0]),
+                      static_cast<int32_t>(qi.y * params_d::inv_cell_leng[1]),
+                      static_cast<int32_t>(qi.z * params_d::inv_cell_leng[2]) };
+    if (idx[0] == params_d::cell_numb[0]) idx[0]--;
+    if (idx[1] == params_d::cell_numb[1]) idx[1]--;
+    if (idx[2] == params_d::cell_numb[2]) idx[2]--;
+    cell_id_of_ptcl[tid] = gen_hash(idx, params_d::cell_numb);
   }
 }
 
 template <typename Vec, typename Dtype>
 class NeighListGPU {
   bool valid_ = false;
-  int32_t grid_numb_[3], all_grid_ = -1;
-  Dtype grid_leng_[3], inv_grid_leng_[3];
+  int32_t cell_numb_[3], all_cell_ = -1;
+  Dtype cell_leng_[3], inv_cell_leng_[3];
   Dtype search_length_ = 0.0, search_length2_ = 0.0;
 
-  cuda_ptr<int32_t> grid_id_of_ptcl_, neigh_grid_id_, grid_pointer_, number_in_grid_;
-  cuda_ptr<int32_t> ptcl_id_in_grid_;
+  int32_t nmax_in_cell_ = 0;
+  cuda_ptr<int32_t> cell_id_of_ptcl_, neigh_cell_id_, cell_pointer_, number_in_cell_;
+  cuda_ptr<int32_t> ptcl_id_in_cell_;
   cuda_ptr<int32_t> neigh_list_, number_of_partners_;
 
   thrust::device_ptr<Vec> buffer_;
@@ -54,31 +56,32 @@ class NeighListGPU {
   enum : int32_t {
     MAX_PARTNERS = 400,
     SORT_FREQ = 50,
+    WARP_SIZE = 32,
   };
 
   int32_t GenHash(const Vec& q) const {
     int32_t idx[] = {
-      static_cast<int32_t>(q.x * inv_grid_leng_[0]),
-      static_cast<int32_t>(q.y * inv_grid_leng_[1]),
-      static_cast<int32_t>(q.z * inv_grid_leng_[2])
+      static_cast<int32_t>(q.x * inv_cell_leng_[0]),
+      static_cast<int32_t>(q.y * inv_cell_leng_[1]),
+      static_cast<int32_t>(q.z * inv_cell_leng_[2])
     };
     ApplyPBC(idx);
-    return gen_hash(idx, grid_numb_);
+    return gen_hash(idx, cell_numb_);
   }
 
   void ApplyPBC(int32_t* idx) const {
     for (int i = 0; i < 3; i++) {
-      if (idx[i] < 0) idx[i] += grid_numb_[i];
-      if (idx[i] >= grid_numb_[i]) idx[i] -= grid_numb_[i];
+      if (idx[i] < 0) idx[i] += cell_numb_[i];
+      if (idx[i] >= cell_numb_[i]) idx[i] -= cell_numb_[i];
     }
   }
 
   void Allocate(const int32_t particle_number) {
-    grid_id_of_ptcl_.allocate(particle_number);
-    neigh_grid_id_.allocate(27 * all_grid_);
-    grid_pointer_.allocate(all_grid_ + 1);
-    number_in_grid_.allocate(all_grid_);
-    ptcl_id_in_grid_.allocate(particle_number);
+    cell_id_of_ptcl_.allocate(particle_number);
+    neigh_cell_id_.allocate(27 * all_cell_);
+    cell_pointer_.allocate(all_cell_ + 1);
+    number_in_cell_.allocate(all_cell_);
+    ptcl_id_in_cell_.allocate(particle_number);
     neigh_list_.allocate(MAX_PARTNERS * particle_number);
     number_of_partners_.allocate(particle_number);
     buffer_   = thrust::device_new<Vec>(particle_number);
@@ -92,23 +95,23 @@ class NeighListGPU {
     thrust::device_delete(out_key_);
   }
 
-  void MakeNeighGridId() {
+  void MakeNeighCellId() {
     int32_t icell_id = 0;
-    for (int32_t iz = 0; iz < grid_numb_[2]; iz++)
-      for (int32_t iy = 0; iy < grid_numb_[1]; iy++)
-        for (int32_t ix = 0; ix < grid_numb_[0]; ix++) {
+    for (int32_t iz = 0; iz < cell_numb_[2]; iz++)
+      for (int32_t iy = 0; iy < cell_numb_[1]; iy++)
+        for (int32_t ix = 0; ix < cell_numb_[0]; ix++) {
           int32_t jcell_id = 0;
           for (int32_t jz = -1; jz < 2; jz++)
             for (int32_t jy = -1; jy < 2; jy++)
               for (int32_t jx = -1; jx < 2; jx++) {
                 int32_t idx[] = { ix + jx, iy + jy, iz + jz };
                 ApplyPBC(idx);
-                neigh_grid_id_[27 * icell_id + jcell_id] = gen_hash(idx, grid_numb_);
+                neigh_cell_id_[27 * icell_id + jcell_id] = gen_hash(idx, cell_numb_);
                 jcell_id++;
               }
           icell_id++;
         }
-    neigh_grid_id_.host2dev();
+    neigh_cell_id_.host2dev();
   }
 
   template <typename T>
@@ -120,69 +123,69 @@ class NeighListGPU {
     thrust::gather(key, key + size, buf, src);
   }
 
-  void CountNumberInEachGrid(const int32_t particle_number) {
-    const auto new_end = thrust::reduce_by_key(grid_id_of_ptcl_.thrust_ptr,
-                                               grid_id_of_ptcl_.thrust_ptr + particle_number,
+  void CountNumberInEachCell(const int32_t particle_number) {
+    const auto new_end = thrust::reduce_by_key(cell_id_of_ptcl_.thrust_ptr,
+                                               cell_id_of_ptcl_.thrust_ptr + particle_number,
                                                uni_vect_,
                                                out_key_,
-                                               number_in_grid_.thrust_ptr);
-    const int val_elem = new_end.second - number_in_grid_.thrust_ptr;
+                                               number_in_cell_.thrust_ptr);
 #ifdef DEBUG
-    if (val_elem != all_grid_) {
+    const int val_elem = new_end.second - number_in_cell_.thrust_ptr;
+    if (val_elem != all_cell_) {
       std::cerr << "val_elem = " << val_elem << std::endl;
-      std::cerr << "all_grid_ = " << all_grid_ << std::endl;
+      std::cerr << "all_cell_ = " << all_cell_ << std::endl;
       std::exit(1);
     }
 #endif
-    const int nmax_in_cell = thrust::reduce(number_in_grid_.thrust_ptr,
-                                            number_in_grid_.thrust_ptr + val_elem,
-                                            0,
-                                            thrust::maximum<int>());
-    thrust::inclusive_scan(number_in_grid_.thrust_ptr,
-                           number_in_grid_.thrust_ptr + all_grid_,
-                           grid_pointer_.thrust_ptr + 1);
+    nmax_in_cell_ = thrust::reduce(number_in_cell_.thrust_ptr,
+                                   number_in_cell_.thrust_ptr + all_cell_,
+                                   0,
+                                   thrust::maximum<int>());
+    thrust::inclusive_scan(number_in_cell_.thrust_ptr,
+                           number_in_cell_.thrust_ptr + all_cell_,
+                           cell_pointer_.thrust_ptr + 1);
   }
 
   void SortPtclData(cuda_ptr<Vec>& q,
                     cuda_ptr<Vec>& p,
                     const int32_t particle_number) {
-    thrust::sequence(ptcl_id_in_grid_.thrust_ptr,
-                     ptcl_id_in_grid_.thrust_ptr + particle_number);
-    thrust::sort_by_key(grid_id_of_ptcl_.thrust_ptr,
-                        grid_id_of_ptcl_.thrust_ptr + particle_number,
-                        ptcl_id_in_grid_.thrust_ptr);
+    thrust::sequence(ptcl_id_in_cell_.thrust_ptr,
+                     ptcl_id_in_cell_.thrust_ptr + particle_number);
+    thrust::sort_by_key(cell_id_of_ptcl_.thrust_ptr,
+                        cell_id_of_ptcl_.thrust_ptr + particle_number,
+                        ptcl_id_in_cell_.thrust_ptr);
     CopyGather(q.thrust_ptr,
                buffer_,
-               ptcl_id_in_grid_.thrust_ptr,
+               ptcl_id_in_cell_.thrust_ptr,
                particle_number);
     CopyGather(p.thrust_ptr,
                buffer_,
-               ptcl_id_in_grid_.thrust_ptr,
+               ptcl_id_in_cell_.thrust_ptr,
                particle_number);
-    // thrust::sequence(ptcl_id_in_grid_.thrust_ptr,
-    //                  ptcl_id_in_grid_.thrust_ptr + particle_number);
+    // thrust::sequence(ptcl_id_in_cell_.thrust_ptr,
+    //                  ptcl_id_in_cell_.thrust_ptr + particle_number);
   }
 
-  void CheckGridIdOfPtcl(const int32_t particle_number,
+  void CheckCellIdOfPtcl(const int32_t particle_number,
                          cuda_ptr<Vec>& q) {
-    grid_id_of_ptcl_.dev2host();
+    cell_id_of_ptcl_.dev2host();
     for (int i = 0; i < particle_number; i++) {
       const auto ref = GenHash(q[i]);
-      if (grid_id_of_ptcl_[i] != ref) {
-        std::cerr << "grid_id_of_ptcl_ is not correct.\n";
+      if (cell_id_of_ptcl_[i] != ref) {
+        std::cerr << "cell_id_of_ptcl_ is not correct.\n";
         std::exit(1);
       }
     }
-    std::cerr << "grid_id_of_ptcl_ is correct.\n";
+    std::cerr << "cell_id_of_ptcl_ is correct.\n";
   }
 
   void CheckSorted(cuda_ptr<Vec>& q,
                    const int32_t particle_number) {
     q.dev2host();
-    grid_id_of_ptcl_.dev2host();
+    cell_id_of_ptcl_.dev2host();
     for (int32_t i = 0; i < particle_number; i++) {
       const auto hash = GenHash(q[i]);
-      if (hash != grid_id_of_ptcl_[i]) {
+      if (hash != cell_id_of_ptcl_[i]) {
         std::cerr << "particle data is not correctly sorted.\n";
         std::exit(1);
       }
@@ -190,21 +193,21 @@ class NeighListGPU {
     std::cerr << "particle data is sorted.\n";
   }
 
-  void CheckGridPointer(cuda_ptr<Vec>& q) {
+  void CheckCellPointer(cuda_ptr<Vec>& q) {
     q.dev2host();
-    grid_pointer_.dev2host();
-    for (int32_t grid = 0; grid < all_grid_; grid++) {
-      const auto beg = grid_pointer_[grid    ];
-      const auto end = grid_pointer_[grid + 1];
+    cell_pointer_.dev2host();
+    for (int32_t cell = 0; cell < all_cell_; cell++) {
+      const auto beg = cell_pointer_[cell    ];
+      const auto end = cell_pointer_[cell + 1];
       for (int32_t i = beg; i < end; i++) {
         const auto hash = GenHash(q[i]);
-        if (hash != grid) {
-          std::cerr << "grid_pointer is not correctly sorted.\n";
+        if (hash != cell) {
+          std::cerr << "cell_pointer is not correctly sorted.\n";
           std::exit(1);
         }
       }
     }
-    std::cerr << "grid_pointer is correct.\n";
+    std::cerr << "cell_pointer is correct.\n";
   }
 
 public:
@@ -212,18 +215,18 @@ public:
                const Dtype Lx,
                const Dtype Ly,
                const Dtype Lz) {
-    grid_numb_[0] = static_cast<int32_t>(Lx / search_length);
-    grid_numb_[1] = static_cast<int32_t>(Ly / search_length);
-    grid_numb_[2] = static_cast<int32_t>(Lz / search_length);
-    all_grid_ = grid_numb_[0] * grid_numb_[1] * grid_numb_[2];
+    cell_numb_[0] = static_cast<int32_t>(Lx / search_length);
+    cell_numb_[1] = static_cast<int32_t>(Ly / search_length);
+    cell_numb_[2] = static_cast<int32_t>(Lz / search_length);
+    all_cell_ = cell_numb_[0] * cell_numb_[1] * cell_numb_[2];
 
-    grid_leng_[0] = Lx / grid_numb_[0];
-    grid_leng_[1] = Ly / grid_numb_[1];
-    grid_leng_[2] = Lz / grid_numb_[2];
+    cell_leng_[0] = Lx / cell_numb_[0];
+    cell_leng_[1] = Ly / cell_numb_[1];
+    cell_leng_[2] = Lz / cell_numb_[2];
 
-    inv_grid_leng_[0] = 1.0 / grid_leng_[0];
-    inv_grid_leng_[1] = 1.0 / grid_leng_[1];
-    inv_grid_leng_[2] = 1.0 / grid_leng_[2];
+    inv_cell_leng_[0] = 1.0 / cell_leng_[0];
+    inv_cell_leng_[1] = 1.0 / cell_leng_[1];
+    inv_cell_leng_[2] = 1.0 / cell_leng_[2];
 
     search_length_  = search_length;
     search_length2_ = search_length * search_length;
@@ -245,45 +248,121 @@ public:
 
     neigh_list_.set_val(-1);
     number_of_partners_.set_val(0);
-    grid_pointer_.set_val(0);
+    cell_pointer_.set_val(0);
     thrust::fill(uni_vect_, uni_vect_ + particle_number, 1);
 
-    checkCudaErrors(cudaMemcpyToSymbol(params_d::grid_numb,
-                                       grid_numb_,
+    checkCudaErrors(cudaMemcpyToSymbol(params_d::cell_numb,
+                                       cell_numb_,
                                        3 * sizeof(int32_t)));
-    checkCudaErrors(cudaMemcpyToSymbol(params_d::inv_grid_leng,
-                                       inv_grid_leng_,
+    checkCudaErrors(cudaMemcpyToSymbol(params_d::inv_cell_leng,
+                                       inv_cell_leng_,
                                        3 * sizeof(Dtype)));
 
-    MakeNeighGridId();
+    MakeNeighCellId();
   }
 
   void MakeNeighList(cuda_ptr<Vec>& q,
                      cuda_ptr<Vec>& p,
                      const int32_t particle_number,
-                     const int32_t tblock_size) {
+                     const bool sync = true,
+                     int32_t tblock_size = 128,
+                     const int32_t smem_hei = 7) {
     if (valid_) return;
 
-    const int32_t grid_size = particle_number / tblock_size + 1;
-    gen_grid_id<Vec><<<grid_size, tblock_size>>>(q, grid_id_of_ptcl_, particle_number);
+    const int32_t cell_size = particle_number / tblock_size + 1;
+    gen_cell_id<Vec><<<cell_size, tblock_size>>>(q, cell_id_of_ptcl_, particle_number);
     SortPtclData(q, p, particle_number);
-    CountNumberInEachGrid(particle_number);
+    CountNumberInEachCell(particle_number);
 
 #ifdef DEBUG
-    CheckGridIdOfPtcl(particle_number, q);
+    CheckCellIdOfPtcl(particle_number, q);
     CheckSorted(q, particle_number);
-    CheckGridPointer(q);
+    CheckCellPointer(q);
 #endif
 
-    make_neighlist_naive<Vec><<<grid_size, tblock_size>>>(q,
-                                                          grid_id_of_ptcl_,
-                                                          neigh_grid_id_,
-                                                          grid_pointer_,
+    static bool is_first = true;
+#ifdef REFERENCE
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_naive<Vec, Dtype>,
+                                             cudaFuncCachePreferL1));
+      is_first = false;
+    }
+    make_neighlist_naive<Vec><<<cell_size, tblock_size>>>(q,
+                                                          cell_id_of_ptcl_,
+                                                          neigh_cell_id_,
+                                                          cell_pointer_,
                                                           neigh_list_,
                                                           number_of_partners_,
                                                           search_length2_,
                                                           particle_number);
-    checkCudaErrors(cudaDeviceSynchronize());
+#elif defined USE_ROC
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_roc<Vec, Dtype>,
+                                             cudaFuncCachePreferL1));
+      is_first = false;
+    }
+    make_neighlist_roc<Vec><<<cell_size, tblock_size>>>(q,
+                                                        cell_id_of_ptcl_,
+                                                        neigh_cell_id_,
+                                                        cell_pointer_,
+                                                        neigh_list_,
+                                                        number_of_partners_,
+                                                        search_length2_,
+                                                        particle_number);
+#elif defined USE_SMEM
+    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
+    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem<Vec, Dtype>,
+                                             cudaFuncCachePreferShared));
+      is_first = false;
+    }
+    make_neighlist_smem<Vec><<<cell_size, tblock_size, smem_size>>>(q,
+                                                                    cell_id_of_ptcl_,
+                                                                    neigh_cell_id_,
+                                                                    cell_pointer_,
+                                                                    neigh_list_,
+                                                                    number_of_partners_,
+                                                                    smem_hei,
+                                                                    search_length2_,
+                                                                    particle_number);
+#elif defined USE_SMEM_COARS
+    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
+    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem_coars<Vec, Dtype>,
+                                             cudaFuncCachePreferShared));
+      is_first = false;
+    }
+    make_neighlist_smem_coars<Vec><<<cell_size, tblock_size, smem_size>>>(q,
+                                                                          cell_id_of_ptcl_,
+                                                                          neigh_cell_id_,
+                                                                          cell_pointer_,
+                                                                          neigh_list_,
+                                                                          number_of_partners_,
+                                                                          smem_hei,
+                                                                          search_length2_,
+                                                                          particle_number);
+#elif defined USE_SMEM_CELL
+    tblock_size = ((nmax_in_cell_ - 1) / WARP_SIZE + 1) * WARP_SIZE;
+    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
+    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem_cell<Vec, Dtype>,
+                                             cudaFuncCachePreferShared));
+      is_first = false;
+    }
+    make_neighlist_smem_cell<Vec><<<all_cell_, tblock_size, smem_size>>>(q,
+                                                                         neigh_cell_id_,
+                                                                         cell_pointer_,
+                                                                         neigh_list_,
+                                                                         number_of_partners_,
+                                                                         smem_hei,
+                                                                         search_length2_,
+                                                                         particle_number);
+#endif
+
+    if (sync) checkCudaErrors(cudaDeviceSynchronize());
   }
 
   const cuda_ptr<int32_t>& neigh_list() const {

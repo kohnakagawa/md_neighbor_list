@@ -2,7 +2,6 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>
-#include <boost/program_options.hpp>
 
 typedef double Dtype;
 
@@ -95,21 +94,14 @@ void make_neighlist_bruteforce(const Vec* q,
 #define PRINT_WITH_TAG(ost, val) ost << #val << " " << val << "\n"
 
 int main(int argc, char* argv[]) {
-  // get command line argument.
-  boost::program_options::options_description opt("option");
-  opt.add_options()
-    ("gpu_id,g",  boost::program_options::value<int>()->default_value(0), "gpu id")
-    ("tblock_size,tb",  boost::program_options::value<int>()->default_value(128), "size of thread block");
-  boost::program_options::variables_map vm;
-  try {
-     boost::program_options::store( boost::program_options::parse_command_line(argc, argv, opt), vm);
-  } catch (const  boost::program_options::error_with_option_name e) {
-    std::cerr << e.what() << std::endl;
-    return 1;
+  int32_t tblock_size = 128, smem_hei = 7;
+  if (argc != 3) {
+    std::cerr << "argv[1] = thread block size (default 128).\n";
+    std::cerr << "argv[2] = shared memory tile height (default 7, max 20).\n";
+  } else {
+    tblock_size = std::atoi(argv[1]);
+    smem_hei    = std::atoi(argv[2]);
   }
-  boost::program_options::notify(vm);
-  const auto gpu_id = vm["gpu_id"].as<int>();
-  const auto tblock_size = vm["tblock_size"].as<int>();
 
   // buffer data
   cuda_ptr<double4> q_d4, p_d4;
@@ -124,8 +116,10 @@ int main(int argc, char* argv[]) {
   NeighListGPU<double4, double> nlistmaker(SEARCH_LENGTH, L, L, L);
   nlistmaker.Initialize(particle_number);
   const auto beg = std::chrono::system_clock::now();
-  for (int i = 0; i < LOOP; i++)
-    nlistmaker.MakeNeighList(q_d4, p_d4, particle_number, tblock_size);
+  for (int i = 0; i < LOOP; i++) {
+    nlistmaker.MakeNeighList(q_d4, p_d4, particle_number, false, tblock_size, smem_hei);
+  }
+  checkCudaErrors(cudaDeviceSynchronize());
   const auto end = std::chrono::system_clock::now();
   const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count();
   std::cout << "# of particles " << particle_number

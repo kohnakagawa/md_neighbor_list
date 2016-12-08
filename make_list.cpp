@@ -126,15 +126,17 @@ int main(int argc, char* argv[]) {
   Vec* __restrict p = new Vec [N];
   int particle_number = 0;
   init(q, particle_number);
-  for (int i = 0; i < particle_number; i++)
+  for (int i = 0; i < particle_number; i++) {
     p[i].x = p[i].y = p[i].z = 0.0;
+  }
 
   // make neighbor list
   NeighList<Vec> nlist(SEARCH_LENGTH, L, L, L);
   nlist.Initialize(particle_number);
   const auto beg = std::chrono::system_clock::now();
-  for (int i = 0; i < LOOP; i++)
+  for (int i = 0; i < LOOP; i++) {
     nlist.MakeNeighList(q, p, particle_number);
+  }
   const auto end = std::chrono::system_clock::now();
   const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count();
   std::cout << "# of particles " << particle_number
