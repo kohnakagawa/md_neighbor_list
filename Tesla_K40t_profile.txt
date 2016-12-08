@@ -1,0 +1,233 @@
+Device 0: "Tesla K40t"
+  CUDA Driver Version / Runtime Version          7.0 / 7.0
+  CUDA Capability Major/Minor version number:    3.5
+  Total amount of global memory:                 11520 MBytes (12079136768 bytes)
+  (15) Multiprocessors, (192) CUDA Cores/MP:     2880 CUDA Cores
+  GPU Max Clock rate:                            745 MHz (0.75 GHz)
+  Memory Clock rate:                             3004 Mhz
+  Memory Bus Width:                              384-bit
+  L2 Cache Size:                                 1572864 bytes
+  Maximum Texture Dimension Size (x,y,z)         1D=(65536), 2D=(65536, 65536), 3D=(4096, 4096, 4096)
+  Maximum Layered 1D Texture Size, (num) layers  1D=(16384), 2048 layers
+  Maximum Layered 2D Texture Size, (num) layers  2D=(16384, 16384), 2048 layers
+  Total amount of constant memory:               65536 bytes
+  Total amount of shared memory per block:       49152 bytes
+  Total number of registers available per block: 65536
+  Warp size:                                     32
+  Maximum number of threads per multiprocessor:  2048
+  Maximum number of threads per block:           1024
+  Max dimension size of a thread block (x,y,z): (1024, 1024, 64)
+  Max dimension size of a grid size    (x,y,z): (2147483647, 65535, 65535)
+  Maximum memory pitch:                          2147483647 bytes
+  Texture alignment:                             512 bytes
+  Concurrent copy and kernel execution:          Yes with 2 copy engine(s)
+  Run time limit on kernels:                     No
+  Integrated GPU sharing Host Memory:            No
+  Support host page-locked memory mapping:       Yes
+  Alignment requirement for Surfaces:            Yes
+  Device has ECC support:                        Enabled
+  Device supports Unified Addressing (UVA):      Yes
+  Device PCI Domain ID / Bus ID / location ID:   0 / 4 / 0
+  Compute Mode:
+     < Default (multiple host threads can use ::cudaSetDevice() with device simultaneously) >
+
+[CUDA Bandwidth Test] - Starting...
+Running on...
+
+ Device 0: Tesla K40t
+ Quick Mode
+
+ Host to Device Bandwidth, 1 Device(s)
+ PINNED Memory Transfers
+   Transfer Size (Bytes)	Bandwidth(MB/s)
+   33554432			10010.4
+
+ Device to Host Bandwidth, 1 Device(s)
+ PINNED Memory Transfers
+   Transfer Size (Bytes)	Bandwidth(MB/s)
+   33554432			10151.5
+
+ Device to Device Bandwidth, 1 Device(s)
+ PINNED Memory Transfers
+   Transfer Size (Bytes)	Bandwidth(MB/s)
+   33554432			183748.0
+
+Result = PASS
+
+NOTE: The CUDA Samples are not meant for performance measurements. Results may vary when GPU Boost is enabled.
+
+Thu Dec  8 16:14:30 2016       
++------------------------------------------------------+                       
+| NVIDIA-SMI 346.59     Driver Version: 346.59         |                       
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|===============================+======================+======================|
+|   0  Tesla K40t          On   | 0000:04:00.0     Off |                    0 |
+| N/A   24C    P8    19W / 235W |     55MiB / 11519MiB |      0%      Default |
++-------------------------------+----------------------+----------------------+
+|   1  Tesla K40t          On   | 0000:83:00.0     Off |                    0 |
+| N/A   26C    P8    20W / 235W |     55MiB / 11519MiB |      0%      Default |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                       GPU Memory |
+|  GPU       PID  Type  Process name                               Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+
+metrics
+	Kernel: void make_neighlist_smem<double4, double>(double4 const *, int const *, int const *, int const *, int*, int*, int, double, int)
+          1                  l1_cache_global_hit_rate                        L1 Global Hit Rate       0.00%       0.00%       0.00%
+          1                   l1_cache_local_hit_rate                         L1 Local Hit Rate       0.00%       0.00%       0.00%
+          1                             sm_efficiency                   Multiprocessor Activity      99.51%      99.51%      99.51%
+          1                                       ipc                              Executed IPC    0.739438    0.739438    0.739438
+          1                        achieved_occupancy                        Achieved Occupancy    0.760372    0.760372    0.760372
+          1                  gld_requested_throughput          Requested Global Load Throughput  177.41MB/s  177.41MB/s  177.41MB/s
+          1                  gst_requested_throughput         Requested Global Store Throughput  3.9202GB/s  3.9202GB/s  3.9202GB/s
+          1                    sm_efficiency_instance                   Multiprocessor Activity      99.51%      99.51%      99.51%
+          1                              ipc_instance                              Executed IPC    0.739438    0.739438    0.739438
+          1                      inst_replay_overhead               Instruction Replay Overhead    0.357258    0.357258    0.357258
+          1                    shared_replay_overhead             Shared Memory Replay Overhead    0.000000    0.000000    0.000000
+          1                    global_replay_overhead             Global Memory Replay Overhead    0.096612    0.096612    0.096612
+          1              global_cache_replay_overhead       Global Memory Cache Replay Overhead    0.000000    0.000000    0.000000
+          1                        tex_cache_hit_rate                    Texture Cache Hit Rate      89.19%      89.19%      89.19%
+          1                      tex_cache_throughput                  Texture Cache Throughput  175.67GB/s  175.67GB/s  175.67GB/s
+          1                      dram_read_throughput             Device Memory Read Throughput  58.716GB/s  58.716GB/s  58.716GB/s
+          1                     dram_write_throughput            Device Memory Write Throughput  47.428GB/s  47.428GB/s  47.428GB/s
+          1                            gst_throughput                   Global Store Throughput  29.851GB/s  29.851GB/s  29.851GB/s
+          1                            gld_throughput                    Global Load Throughput  473.09MB/s  473.09MB/s  473.09MB/s
+          1                     local_replay_overhead        Local Memory Cache Replay Overhead    0.000000    0.000000    0.000000
+          1                         shared_efficiency                  Shared Memory Efficiency       9.23%       9.23%       9.23%
+          1                            gld_efficiency             Global Memory Load Efficiency      37.50%      37.50%      37.50%
+          1                            gst_efficiency            Global Memory Store Efficiency      13.13%      13.13%      13.13%
+          1                       l2_l1_read_hit_rate                    L2 Hit Rate (L1 Reads)      56.87%      56.87%      56.87%
+          1                  l2_texture_read_hit_rate               L2 Hit Rate (Texture Reads)      42.41%      42.41%      42.41%
+          1                     l2_l1_read_throughput                  L2 Throughput (L1 Reads)  473.09MB/s  473.09MB/s  473.09MB/s
+          1                l2_texture_read_throughput             L2 Throughput (Texture Reads)  13.660GB/s  13.660GB/s  13.660GB/s
+          1                     local_memory_overhead                     Local Memory Overhead       0.00%       0.00%       0.00%
+          1                 warp_execution_efficiency                 Warp Execution Efficiency      88.80%      88.80%      88.80%
+          1               nc_gld_requested_throughput  Requested Non-Coherent Global Load Throu  172.35GB/s  172.35GB/s  172.35GB/s
+          1                                issued_ipc                                Issued IPC    1.003889    1.003889    1.003889
+          1                             inst_per_warp                     Instructions per warp  3.5856e+04  3.5856e+04  3.5856e+04
+          1                    issue_slot_utilization                    Issue Slot Utilization      22.13%      22.13%      22.13%
+          1       local_load_transactions_per_request  Local Memory Load Transactions Per Reque    0.000000    0.000000    0.000000
+          1      local_store_transactions_per_request  Local Memory Store Transactions Per Requ    0.000000    0.000000    0.000000
+          1      shared_load_transactions_per_request  Shared Memory Load Transactions Per Requ    1.000000    1.000000    1.000000
+          1     shared_store_transactions_per_request  Shared Memory Store Transactions Per Req    1.000000    1.000000    1.000000
+          1              gld_transactions_per_request      Global Load Transactions Per Request    7.999731    7.999731    7.999731
+          1              gst_transactions_per_request     Global Store Transactions Per Request    9.302672    9.302672    9.302672
+          1                   local_load_transactions                   Local Load Transactions           0           0           0
+          1                  local_store_transactions                  Local Store Transactions           0           0           0
+          1                  shared_load_transactions                  Shared Load Transactions     1543755     1543755     1543755
+          1                 shared_store_transactions                 Shared Store Transactions     3763065     3763065     3763065
+          1                          gld_transactions                  Global Load Transactions       59582       59582       59582
+          1                          gst_transactions                 Global Store Transactions    14395689    14395689    14395689
+          1                  sysmem_read_transactions           System Memory Read Transactions           0           0           0
+          1                 sysmem_write_transactions          System Memory Write Transactions          14          14          14
+          1                    tex_cache_transactions                Texture Cache Transactions    88495495    88495495    88495495
+          1                    dram_read_transactions           Device Memory Read Transactions    29579184    29579184    29579184
+          1                   dram_write_transactions          Device Memory Write Transactions    23892687    23892687    23892687
+          1                      l2_read_transactions                      L2 Read Transactions     7127856     7127856     7127856
+          1                     l2_write_transactions                     L2 Write Transactions    26484325    26484325    26484325
+          1                     local_load_throughput              Local Memory Load Throughput  0.00000B/s  0.00000B/s  0.00000B/s
+          1                    local_store_throughput             Local Memory Store Throughput  0.00000B/s  0.00000B/s  0.00000B/s
+          1                    shared_load_throughput             Shared Memory Load Throughput  24.515GB/s  24.515GB/s  24.515GB/s
+          1                   shared_store_throughput            Shared Memory Store Throughput  59.759GB/s  59.759GB/s  59.759GB/s
+          1                        l2_read_throughput                     L2 Throughput (Reads)  14.149GB/s  14.149GB/s  14.149GB/s
+          1                       l2_write_throughput                    L2 Throughput (Writes)  52.573GB/s  52.573GB/s  52.573GB/s
+          1                    sysmem_read_throughput             System Memory Read Throughput  0.00000B/s  0.00000B/s  0.00000B/s
+          1                   sysmem_write_throughput            System Memory Write Throughput  27.790KB/s  27.790KB/s  27.790KB/s
+          1         warp_nonpred_execution_efficiency  Warp Non-Predicated Execution Efficiency      78.89%      78.89%      78.89%
+          1                                 cf_issued          Issued Control-Flow Instructions    27578460    27578460    27578460
+          1                               cf_executed        Executed Control-Flow Instructions    25087851    25087851    25087851
+          1                               ldst_issued            Issued Load/Store Instructions    29568440    29568440    29568440
+          1                             ldst_executed          Executed Load/Store Instructions    14693245    14693245    14693245
+          1                             flop_count_sp  Floating Point Operations(Single Precisi           0           0           0
+          1                         flop_count_sp_add  Floating Point Operations(Single Precisi           0           0           0
+          1                         flop_count_sp_mul  Floating Point Operation(Single Precisio           0           0           0
+          1                         flop_count_sp_fma  Floating Point Operations(Single Precisi           0           0           0
+          1                             flop_count_dp  Floating Point Operations(Double Precisi   913066016   913066016   913066016
+          1                         flop_count_dp_add  Floating Point Operations(Double Precisi   342399756   342399756   342399756
+          1                         flop_count_dp_mul  Floating Point Operations(Double Precisi   114133252   114133252   114133252
+          1                         flop_count_dp_fma  Floating Point Operations(Double Preciso   228266504   228266504   228266504
+          1                     flop_count_sp_special  Floating Point Operations(Single Precisi           0           0           0
+          1                          stall_inst_fetch  Issue Stall Reasons (Instructions Fetch)       2.30%       2.30%       2.30%
+          1                     stall_exec_dependency  Issue Stall Reasons (Execution Dependenc      10.44%      10.44%      10.44%
+          1                   stall_memory_dependency        Issue Stall Reasons (Data Request)      81.44%      81.44%      81.44%
+          1                             stall_texture             Issue Stall Reasons (Texture)       0.94%       0.94%       0.94%
+          1                                stall_sync     Issue Stall Reasons (Synchronization)       0.00%       0.00%       0.00%
+          1                               stall_other               Issue Stall Reasons (Other)       0.49%       0.49%       0.49%
+          1                     l1_shared_utilization              L1/Shared Memory Utilization     Low (1)     Low (1)     Low (1)
+          1                            l2_utilization                      L2 Cache Utilization     Low (2)     Low (2)     Low (2)
+          1                           tex_utilization                 Texture Cache Utilization     Low (2)     Low (2)     Low (2)
+          1                          dram_utilization                 Device Memory Utilization     Mid (4)     Mid (4)     Mid (4)
+          1                        sysmem_utilization                 System Memory Utilization     Low (1)     Low (1)     Low (1)
+          1                       ldst_fu_utilization      Load/Store Function Unit Utilization     Low (2)     Low (2)     Low (2)
+          1                        alu_fu_utilization      Arithmetic Function Unit Utilization     Low (1)     Low (1)     Low (1)
+          1                         cf_fu_utilization    Control-Flow Function Unit Utilization     Low (1)     Low (1)     Low (1)
+          1                        tex_fu_utilization         Texture Function Unit Utilization     Low (1)     Low (1)     Low (1)
+          1                             inst_executed                     Instructions Executed   133527379   133527379   133527379
+          1                               inst_issued                       Instructions Issued   181231064   181231064   181231064
+          1                               issue_slots                               Issue Slots   159769595   159769595   159769595
+          1                     nc_l2_read_throughput        L2 Throughput (Non-Coherent Reads)  13.621GB/s  13.621GB/s  13.621GB/s
+          1                   nc_l2_read_transactions         L2 Non-Coherent Read Transactions     6861603     6861603     6861603
+          1                  nc_cache_global_hit_rate              Non-Coherent Global Hit Rate      89.24%      89.24%      89.24%
+          1                         nc_gld_throughput  Non-Coherent Global Memory Load Throughp  126.62GB/s  126.62GB/s  126.62GB/s
+          1                         nc_gld_efficiency       Non-Coherent Global Load Efficiency     136.11%     136.11%     136.11%
+          1                      l2_atomic_throughput           L2 Throughput (Atomic requests)  0.00000B/s  0.00000B/s  0.00000B/s
+          1                                inst_fp_32                   FP Instructions(Single)           0           0           0
+          1                                inst_fp_64                   FP Instructions(Double)   798932764   798932764   798932764
+          1                              inst_integer                      Integer Instructions  1319999784  1319999784  1319999784
+          1                          inst_bit_convert                  Bit-Convert Instructions      119164      119164      119164
+          1                              inst_control                 Control-Flow Instructions   122882844   122882844   122882844
+          1                        inst_compute_ld_st                   Load/Store Instructions   520255284   520255284   520255284
+          1                                 inst_misc                         Misc Instructions   366378641   366378641   366378641
+          1           inst_inter_thread_communication                 Inter-Thread Instructions   114133252   114133252   114133252
+          1                    atomic_replay_overhead                    Atomic Replay Overhead    0.000000    0.000000    0.000000
+          1                       atomic_transactions                       Atomic Transactions           0           0           0
+          1           atomic_transactions_per_request           Atomic Transactions Per Request    0.000000    0.000000    0.000000
+          1                   l2_l1_read_transactions   L2 Read Transactions (L1 read requests)      238328      238328      238328
+          1                  l2_l1_write_transactions  L2 Write Transactions (L1 write requests    15037785    15037785    15037785
+          1                  l2_tex_read_transactions           L2 Transactions (Texture Reads)     6881279     6881279     6881279
+          1                    l2_l1_write_throughput                 L2 Throughput (L1 Writes)  29.851GB/s  29.851GB/s  29.851GB/s
+          1                    l2_atomic_transactions         L2 Transactions (Atomic requests)           0           0           0
+          1                          ecc_transactions                          ECC Transactions    24645887    24645887    24645887
+          1                            ecc_throughput                            ECC Throughput  48.923GB/s  48.923GB/s  48.923GB/s
+          1                           stall_pipe_busy           Issue Stall Reasons (Pipe Busy)       0.24%       0.24%       0.24%
+          1          stall_constant_memory_dependency  Issue Stall Reasons (Immediate constant)       0.00%       0.00%       0.00%
+          1                        flop_sp_efficiency              FLOP Efficiency(Peak Single)       0.00%       0.00%       0.00%
+          1                        flop_dp_efficiency              FLOP Efficiency(Peak Double)       3.93%       3.93%       3.93%
+          1                     stall_memory_throttle     Issue Stall Reasons (Memory Throttle)       2.44%       2.44%       2.44%
+          1                        stall_not_selected        Issue Stall Reasons (Not Selected)       1.71%       1.71%       1.71%
+          1                  eligible_warps_per_cycle           Eligible Warps Per Active Cycle    1.700955    1.700955    1.700955
+          1                         atomic_throughput                         Atomic Throughput  0.00000B/s  0.00000B/s  0.00000B/s
+
+time line
+Time(%)      Time     Calls       Avg       Min       Max  Name
+ 49.95%  19.416ms         6  3.2359ms  2.4320us  18.130ms  [CUDA memcpy DtoH]
+ 41.52%  16.137ms         1  16.137ms  16.137ms  16.137ms  void make_neighlist_smem<double4, double>(double4 const *, int const *, int const *, int const *, int*, int*, int, double, int)
+  3.26%  1.2685ms         5  253.70us     896ns  1.2274ms  [CUDA memcpy HtoD]
+  2.58%  1.0020ms         6  167.00us  1.9840us  988.29us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=0, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=1>, unsigned long=0>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::for_each_n_detail::for_each_kernel, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=0>, thrust::device_ptr<int>, thrust::detail::wrapped_function<thrust::detail::device_generate_functor<thrust::detail::fill_functor<int>>, void>, unsigned int, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=1)
+  0.77%  297.73us         1  297.73us  297.73us  297.73us  _ZN6thrust6system4cuda6detail5bulk_6detail15launch_by_valueILj128ENS4_9cuda_taskINS3_14parallel_groupINS3_16concurrent_groupINS3_5agentILm5EEELm128EEELm0EEENS4_7closureINS2_20reduce_by_key_detail20reduce_by_key_kernelENS_5tupleINS4_6cursorILj1EEENS_10device_ptrIiEENS2_21aligned_decompositionIiEESK_SK_SK_NS_6detail15normal_iteratorINS_7pointerIiNS2_3tagENS_11use_defaultESR_EEEEST_NSO_INSP_IbSQ_SR_SR_EEEENSG_INS_8equal_toIiEENS_4plusIiEENS_9null_typeES10_S10_S10_S10_S10_S10_S10_EEEEEEEEEEvT0_
+  0.33%  130.21us         2  65.104us  65.088us  65.120us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=0, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=1>, unsigned long=0>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::for_each_n_detail::for_each_kernel, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=0>, thrust::zip_iterator<thrust::tuple<thrust::permutation_iterator<thrust::device_ptr<double4>, thrust::device_ptr<int>>, thrust::device_ptr<double4>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::detail::wrapped_function<thrust::detail::unary_transform_functor<thrust::identity<double4>>, void>, unsigned int, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=1)
+  0.32%  122.91us         3  40.971us  40.352us  41.696us  void thrust::system::cuda::detail::cub_::DeviceRadixSortDownsweepKernel<thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxAltDownsweepPolicy, bool=0, int, int, int>(int*, int, int*, int, thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxAltDownsweepPolicy*, int*, int, int, bool, bool, thrust::system::cuda::detail::cub_::GridEvenShare<int*>)
+  0.31%  121.28us         7  17.325us  13.920us  19.936us  void thrust::system::cuda::detail::cub_::RadixSortScanBinsKernel<thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxScanPolicy, int>(int*, int)
+  0.21%  82.784us         4  20.696us  20.320us  21.248us  void thrust::system::cuda::detail::cub_::DeviceRadixSortDownsweepKernel<thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxDownsweepPolicy, bool=0, int, int, int>(int*, int, int*, int, thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxDownsweepPolicy*, int*, int, int, bool, bool, thrust::system::cuda::detail::cub_::GridEvenShare<int*>)
+  0.16%  60.992us         1  60.992us  60.992us  60.992us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=128, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=7>, unsigned long=128>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::reduce_intervals_detail::reduce_intervals_kernel, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::transform_iterator<thrust::detail::tail_flags<thrust::device_ptr<int>, thrust::equal_to<int>, int, long>::tail_flag_functor, thrust::zip_iterator<thrust::tuple<thrust::counting_iterator<long, thrust::use_default, thrust::use_default, thrust::use_default>, thrust::device_ptr<int>, thrust::device_ptr<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::use_default, thrust::use_default>, thrust::system::cuda::detail::aligned_decomposition<int>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::plus<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=7)
+  0.10%  37.184us         4  9.2960us  9.0560us  9.6640us  void thrust::system::cuda::detail::cub_::DeviceRadixSortUpsweepKernel<thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxUpsweepPolicy, bool=0, int, int>(int*, int*, int*, int, int, bool, thrust::system::cuda::detail::cub_::GridEvenShare<int*>)
+  0.08%  29.408us         3  9.8020us  9.3760us  10.592us  void thrust::system::cuda::detail::cub_::DeviceRadixSortUpsweepKernel<thrust::system::cuda::detail::cub_::DeviceRadixSortDispatch<bool=0, int, int, int>::PtxAltUpsweepPolicy, bool=0, int, int>(int*, int*, int*, int, int, bool, thrust::system::cuda::detail::cub_::GridEvenShare<int*>)
+  0.07%  29.088us         1  29.088us  29.088us  29.088us  void gen_cell_id<double4>(double4 const *, int*, int)
+  0.07%  25.408us         4  6.3520us  4.2560us  8.4160us  [CUDA memcpy DtoD]
+  0.06%  23.520us         1  23.520us  23.520us  23.520us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=512, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=3>, unsigned long=512>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::scan_detail::inclusive_scan_n, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::device_ptr<int>, long, thrust::device_ptr<int>, thrust::plus<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=3)
+  0.04%  16.160us         1  16.160us  16.160us  16.160us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=512, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=3>, unsigned long=512>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::scan_detail::inclusive_scan_n, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::zip_iterator<thrust::tuple<thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<unsigned int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, long, thrust::zip_iterator<thrust::tuple<thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<unsigned int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::system::detail::generic::detail::segmented_scan_functor<int, unsigned int, thrust::plus<int>>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=3)
+  0.04%  15.328us         1  15.328us  15.328us  15.328us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=512, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=3>, unsigned long=512>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::scan_detail::inclusive_scan_n, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, long, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::plus<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=3)
+  0.03%  12.096us         1  12.096us  12.096us  12.096us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=128, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=7>, unsigned long=128>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::reduce_detail::reduce_partitions, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::device_ptr<int>, thrust::system::cuda::detail::aligned_decomposition<long>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, int, thrust::plus<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=7)
+  0.03%  10.144us         1  10.144us  10.144us  10.144us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=128, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=7>, unsigned long=128>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::reduce_detail::reduce_partitions, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::device_ptr<int>, thrust::system::cuda::detail::aligned_decomposition<long>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, int, thrust::maximum<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=7)
+  0.02%  9.5040us         1  9.5040us  9.5040us  9.5040us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=128, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=7>, unsigned long=128>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::reduce_detail::reduce_partitions, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::plus<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=7)
+  0.02%  8.1600us         1  8.1600us  8.1600us  8.1600us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=128, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=7>, unsigned long=128>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::reduce_detail::reduce_partitions, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=1>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::maximum<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=7)
+  0.01%  4.9280us         1  4.9280us  4.9280us  4.9280us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=0, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=1>, unsigned long=0>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::for_each_n_detail::for_each_kernel, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=0>, thrust::zip_iterator<thrust::tuple<thrust::counting_iterator<long, thrust::use_default, thrust::use_default, long>, thrust::device_ptr<int>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::detail::wrapped_function<thrust::detail::unary_transform_functor<thrust::system::detail::generic::sequence_detail::sequence_functor<int>>, void>, unsigned int, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=1)
+  0.01%  3.7440us         1  3.7440us  3.7440us  3.7440us  _ZN6thrust6system4cuda6detail5bulk_6detail15launch_by_valueILj0ENS4_9cuda_taskINS3_14parallel_groupINS3_16concurrent_groupINS3_5agentILm1EEELm0EEELm0EEENS4_7closureINS2_17for_each_n_detail15for_each_kernelENS_5tupleINS4_6cursorILj0EEENS_12zip_iteratorINSG_INS_6detail15normal_iteratorINS_7pointerIiNS2_3tagENS_11use_defaultESO_EEEENS_20permutation_iteratorINS_10device_ptrIiEESQ_EENS_18transform_iteratorINS2_20reduce_by_key_detail9tuple_andENSJ_INSG_INSV_INSK_10tail_flagsINSJ_INSG_ISQ_NSL_INSM_IbSN_SO_SO_EEEENS_9null_typeES11_S11_S11_S11_S11_S11_S11_EEEENS_8equal_toINSG_IibS11_S11_S11_S11_S11_S11_S11_S11_EEEEblE17tail_flag_functorENSJ_INSG_INS_17counting_iteratorIlSO_SO_SO_EES13_S13_S11_S11_S11_S11_S11_S11_S11_EEEESO_SO_EES10_S11_S11_S11_S11_S11_S11_S11_S11_EEEESO_SO_EESU_S11_S11_S11_S11_S11_S11_EEEENSK_16wrapped_functionINSK_27binary_transform_if_functorINS_4plusIiEENS_8identityIbEEEEvEEjS11_S11_S11_S11_S11_S11_EEEEEEEEvT0_
+  0.01%  2.9450us         1  2.9450us  2.9450us  2.9450us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=0, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=1>, unsigned long=0>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::for_each_n_detail::for_each_kernel, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=0>, thrust::zip_iterator<thrust::tuple<thrust::zip_iterator<thrust::tuple<thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<bool, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::zip_iterator<thrust::tuple<thrust::detail::normal_iterator<thrust::pointer<int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::detail::normal_iterator<thrust::pointer<bool, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::detail::normal_iterator<thrust::pointer<unsigned int, thrust::system::cuda::detail::tag, thrust::use_default, thrust::use_default>>, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>, thrust::detail::wrapped_function<thrust::detail::binary_transform_functor<thrust::detail::binary_negate<thrust::equal_to<thrust::tuple<int, bool, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>, void>, unsigned int, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=1)
+  0.01%  2.7200us         1  2.7200us  2.7200us  2.7200us  void thrust::system::cuda::detail::bulk_::detail::launch_by_value<unsigned int=0, thrust::system::cuda::detail::bulk_::detail::cuda_task<thrust::system::cuda::detail::bulk_::parallel_group<thrust::system::cuda::detail::bulk_::concurrent_group<thrust::system::cuda::detail::bulk_::agent<unsigned long=1>, unsigned long=0>, unsigned long=0>, thrust::system::cuda::detail::bulk_::detail::closure<thrust::system::cuda::detail::for_each_n_detail::for_each_kernel, thrust::tuple<thrust::system::cuda::detail::bulk_::detail::cursor<unsigned int=0>, thrust::device_ptr<double4>, thrust::detail::wrapped_function<thrust::detail::device_generate_functor<thrust::detail::fill_functor<double4>>, void>, unsigned int, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type, thrust::null_type>>>>(unsigned long=1)
