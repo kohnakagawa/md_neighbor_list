@@ -6,7 +6,6 @@
 #include "neighlist_cpu.hpp"
 
 typedef double Dtype;
-// typedef float Dtype;
 
 const Dtype density = 1.0;
 const int N = 400000; // maximum buffer size
@@ -36,6 +35,9 @@ void add_particle(const Dtype x,
   q[particle_number].x = x + ud(mt);
   q[particle_number].y = y + ud(mt);
   q[particle_number].z = z + ud(mt);
+#ifdef USE_VEC4
+  q[particle_number].w = 0.0;
+#endif
   particle_number++;
 }
 
@@ -144,21 +146,22 @@ int main(int argc, char* argv[]) {
   const auto number_of_pairs = nlist.number_of_pairs();
   int32_t* neigh_list  = nlist.neigh_list();
   int32_t* neigh_pointer = nlist.neigh_pointer();
+  const int32_t* number_of_partners = nlist.number_of_partners();
 
   // reference
-  std::vector<int> neigh_list_buf, number_of_partners, neigh_list_ref, neigh_pointer_ref;
+  std::vector<int> neigh_list_buf, number_of_partners_ref, neigh_list_ref, neigh_pointer_ref;
   int32_t number_of_pairs_ref = 0;
   neigh_list_buf.resize(particle_number * MAX_NEIGH_N, -1);
-  number_of_partners.resize(particle_number, 0);
+  number_of_partners_ref.resize(particle_number, 0);
   neigh_list_ref.resize(particle_number * MAX_NEIGH_N, -1);
   neigh_pointer_ref.resize(particle_number + 1, 0);
   make_neighlist_bruteforce(q,
                             particle_number,
                             neigh_list_buf,
-                            number_of_partners);
+                            number_of_partners_ref);
   make_sorted_list(particle_number,
                    neigh_list_buf,
-                   number_of_partners,
+                   number_of_partners_ref,
                    neigh_list_ref,
                    neigh_pointer_ref,
                    number_of_pairs_ref);
@@ -171,12 +174,22 @@ int main(int argc, char* argv[]) {
     std::exit(1);
   }
 
+  for (int i = 0; i < particle_number; i++) {
+    if (number_of_partners_ref[i] != number_of_partners[i]) {
+      std::cerr << "TEST fail\n";
+      PRINT_WITH_TAG(std::cerr, i);
+      PRINT_WITH_TAG(std::cerr, number_of_partners_ref[i]);
+      PRINT_WITH_TAG(std::cerr, number_of_partners[i]);
+      std::exit(1);
+    }
+  }
+
   for (int i = 0; i < particle_number + 1; i++) {
     if (neigh_pointer_ref[i] != neigh_pointer[i]) {
       std::cerr << "TEST fail\n";
       PRINT_WITH_TAG(std::cerr, i);
-      PRINT_WITH_TAG(std::cerr, neigh_list_ref[i]);
-      PRINT_WITH_TAG(std::cerr, neigh_list[i]);
+      PRINT_WITH_TAG(std::cerr, neigh_pointer_ref[i]);
+      PRINT_WITH_TAG(std::cerr, neigh_pointer[i]);
       std::exit(1);
     }
   }

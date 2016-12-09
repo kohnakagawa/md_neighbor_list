@@ -1,6 +1,10 @@
 #pragma once
 
 #include <cassert>
+#include <vector>
+#include <numeric>
+
+#include "simd_util.hpp"
 
 template <typename Vec>
 class NeighList {
@@ -21,12 +25,15 @@ class NeighList {
   int32_t *neigh_list_ = nullptr, *number_of_partners_ = nullptr;
   int32_t *neigh_pointer_ = nullptr, *neigh_pointer_buf_ = nullptr;
 
+  std::vector<int32_t>* ptcl_id_of_neigh_cell_ = nullptr;
+
   Vec *data_buf_ = nullptr;
 
   enum : int32_t {
     MAX_PARTNERS = 100,
     SORT_FREQ = 50,
     NUM_NEIGH_CELL = 13,
+    NUM_PTCL_IN_NEIGH_CELL = 500,
   };
 
   int32_t GenHash(const int32_t* idx) const {
@@ -56,21 +63,24 @@ class NeighList {
   }
 
   void Allocate(const int32_t particle_number) {
-    cell_id_of_ptcl_    = new int32_t [particle_number];
-    neigh_cell_id_      = new int32_t [NUM_NEIGH_CELL * all_cell_];
-    number_in_cell_     = new int32_t [all_cell_];
-    cell_pointer_       = new int32_t [all_cell_ + 1];
-    cell_pointer_buf_   = new int32_t [all_cell_ + 1];
-    ptcl_id_in_cell_    = new int32_t [particle_number];
-    next_dst_           = new int32_t [particle_number];
-    key_particles_      = new int32_t [MAX_PARTNERS * particle_number];
-    partner_particles_  = new int32_t [MAX_PARTNERS * particle_number];
-    neigh_list_         = new int32_t [MAX_PARTNERS * particle_number];
-    number_of_partners_ = new int32_t [particle_number];
-    neigh_pointer_      = new int32_t [particle_number + 1];
-    neigh_pointer_buf_  = new int32_t [particle_number + 1];
-
-    data_buf_           = new Vec [particle_number];
+    cell_id_of_ptcl_       = new int32_t [particle_number];
+    neigh_cell_id_         = new int32_t [NUM_NEIGH_CELL * all_cell_];
+    number_in_cell_        = new int32_t [all_cell_];
+    cell_pointer_          = new int32_t [all_cell_ + 1];
+    cell_pointer_buf_      = new int32_t [all_cell_ + 1];
+    ptcl_id_in_cell_       = new int32_t [particle_number];
+    next_dst_              = new int32_t [particle_number];
+    key_particles_         = new int32_t [MAX_PARTNERS * particle_number];
+    partner_particles_     = new int32_t [MAX_PARTNERS * particle_number];
+    neigh_list_            = new int32_t [MAX_PARTNERS * particle_number];
+    number_of_partners_    = new int32_t [particle_number];
+    neigh_pointer_         = new int32_t [particle_number + 1];
+    neigh_pointer_buf_     = new int32_t [particle_number + 1];
+    ptcl_id_of_neigh_cell_ = new std::vector<int32_t> [all_cell_];
+    data_buf_              = new Vec [particle_number];
+    for (int32_t i = 0; i < all_cell_; i++) {
+      ptcl_id_of_neigh_cell_[i].resize(NUM_PTCL_IN_NEIGH_CELL);
+    }
   }
 
   void Deallocate() {
@@ -87,7 +97,7 @@ class NeighList {
     delete [] number_of_partners_;
     delete [] neigh_pointer_;
     delete [] neigh_pointer_buf_;
-
+    delete [] ptcl_id_of_neigh_cell_;
     delete [] data_buf_;
   }
 
@@ -165,7 +175,7 @@ class NeighList {
                     const int32_t particle_number) {
     Gather(q, data_buf_, particle_number, next_dst_);
     Gather(p, data_buf_, particle_number, next_dst_);
-    // for (int32_t i = 0; i < particle_number; i++) ptcl_id_in_cell_[i] = i;
+    std::iota(ptcl_id_in_cell_, ptcl_id_in_cell_ + particle_number, 0);
   }
 
   void CheckSorted(const Vec* q) const {
@@ -178,6 +188,25 @@ class NeighList {
           std::cerr << "particle data is not correctly sorted.\n";
           std::exit(1);
         }
+      }
+    }
+  }
+
+  void MakeNeighCellPtclId() {
+    for (int32_t icell = 0; icell < all_cell_; icell++) {
+      ptcl_id_of_neigh_cell_[icell].clear();
+      const auto icell_beg = cell_pointer_[icell    ];
+      const auto icell_end = cell_pointer_[icell + 1];
+      ptcl_id_of_neigh_cell_[icell].insert(ptcl_id_of_neigh_cell_[icell].end(),
+                                           &ptcl_id_in_cell_[icell_beg],
+                                           &ptcl_id_in_cell_[icell_end]);
+      for (int32_t k = 0; k < NUM_NEIGH_CELL; k++) {
+        const auto jcell = neigh_cell_id_[NUM_NEIGH_CELL * icell + k];
+        const auto jcell_beg = cell_pointer_[jcell    ];
+        const auto jcell_end = cell_pointer_[jcell + 1];
+        ptcl_id_of_neigh_cell_[icell].insert(ptcl_id_of_neigh_cell_[icell].end(),
+                                             &ptcl_id_in_cell_[jcell_beg],
+                                             &ptcl_id_in_cell_[jcell_end]);
       }
     }
   }
@@ -206,8 +235,8 @@ class NeighList {
     number_of_pairs_++;
   }
 
-  void MakePairList(const Vec* q,
-                    const int32_t particle_number) {
+  void MakePairListNaive(const Vec* q,
+                         const int32_t particle_number) {
     number_of_pairs_ = 0;
     std::fill(number_of_partners_,
               number_of_partners_ + particle_number,
@@ -224,15 +253,96 @@ class NeighList {
           const auto jcell_beg = cell_pointer_[jcell    ];
           const auto jcell_end = cell_pointer_[jcell + 1];
           for (int32_t j = jcell_beg; j < jcell_end; j++) {
-            const auto qj = q[j];
-            RegistInteractPair(qi, qj, i, j);
+            RegistInteractPair(qi, q[j], i, j);
           }
         }
 
         // for same cell
         for (int32_t j = i + 1; j < icell_end; j++) {
-          const auto qj = q[j];
-          RegistInteractPair(qi, qj, i, j);
+          RegistInteractPair(qi, q[j], i, j);
+        }
+      }
+    }
+  }
+
+  void MakePairListFusedLoop(const Vec* q,
+                             const int32_t particle_number) {
+    MakeNeighCellPtclId();
+    number_of_pairs_ = 0;
+    std::fill(number_of_partners_,
+              number_of_partners_ + particle_number,
+              0);
+    for (int32_t icell = 0; icell < all_cell_; icell++) {
+      const auto icell_beg = cell_pointer_[icell];
+      const auto icell_size = number_in_cell_[icell];
+      const int32_t* pid_of_neigh_cell_loc = &ptcl_id_of_neigh_cell_[icell][0];
+      const int32_t num_of_neigh_cell = ptcl_id_of_neigh_cell_[icell].size();
+      for (int32_t l = 0; l < icell_size; l++) {
+        const auto i = l + icell_beg;
+        const auto qi = q[i];
+        for (int32_t k = l + 1; k < num_of_neigh_cell; k++) {
+          const auto j = pid_of_neigh_cell_loc[k];
+          RegistInteractPair(qi, q[j], i, j);
+        }
+      }
+    }
+  }
+
+  void MakePairListFusedLoopSIMD(const Vec* q,
+                                 const int32_t particle_number) {
+    MakeNeighCellPtclId();
+    number_of_pairs_ = 0;
+    std::fill(number_of_partners_,
+              number_of_partners_ + particle_number,
+              0);
+
+    const v4df vsl2 = _mm256_set_pd(search_length2_,
+                                    search_length2_,
+                                    search_length2_,
+                                    search_length2_);
+    const __m128i vf8 = _mm_set1_epi32(0xffffffff);
+    for (int32_t icell = 0; icell < all_cell_; icell++) {
+      const auto icell_beg = cell_pointer_[icell];
+      const auto icell_size = number_in_cell_[icell];
+      const int32_t* pid_of_neigh_cell_loc = &ptcl_id_of_neigh_cell_[icell][0];
+      const int32_t num_of_neigh_cell = ptcl_id_of_neigh_cell_[icell].size();
+      for (int32_t l = 0; l < icell_size; l++) {
+        const auto i = l + icell_beg;
+        const v4df vqi = _mm256_load_pd(reinterpret_cast<const double*>(q + i));
+        __m128i vi_id   = _mm_set_epi32(i, i, i, i);
+        const auto num_loop = num_of_neigh_cell - (l + 1);
+        for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
+          // calculate distance for 4 pairs
+          const auto ja = pid_of_neigh_cell_loc[k + l + 1];
+          const v4df vqja = _mm256_load_pd(reinterpret_cast<const double*>(q + ja));
+          v4df dvqa = vqja - vqi;
+          const auto jb = pid_of_neigh_cell_loc[k + l + 2];
+          const v4df vqjb = _mm256_load_pd(reinterpret_cast<const double*>(q + jb));
+          v4df dvqb = vqjb - vqi;
+          const auto jc = pid_of_neigh_cell_loc[k + l + 3];
+          const v4df vqjc = _mm256_load_pd(reinterpret_cast<const double*>(q + jc));
+          v4df dvqc = vqjc - vqi;
+          const auto jd = pid_of_neigh_cell_loc[k + l + 4];
+          const v4df vqjd = _mm256_load_pd(reinterpret_cast<const double*>(q + jd));
+          v4df dvqd = vqjd - vqi;
+          transpose_4x4(dvqa, dvqb, dvqc, dvqd);
+          v4df dr2_abcd = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc; // dvqd is no longer needed.
+
+          // dr2 <= search_length2
+          __m256d mask_dr2   = _mm256_cmp_pd(dr2_abcd, vsl2, _CMP_LE_OS);
+
+          __m128i vj_id      = _mm_set_epi32(ja, jb, jc, jd);
+          __m128i mask_id    = _mm_cmplt_epi32(vi_id, vj_id); // i < j
+          __m128i vi_key     = _mm_blendv_epi8(vj_id, vi_id, mask_id);
+          mask_id            = _mm_xor_si128(mask_id, vf8);   // i >= j
+          __m128i vi_partner = _mm_blendv_epi8(vj_id, vi_id, mask_id);
+
+          // how to implement scatter operation?
+        }
+
+        for (int32_t k = (num_loop / 4) * 4; k < num_loop; k++) {
+          const auto j = pid_of_neigh_cell_loc[k + l + 1];
+          RegistInteractPair(q[i], q[j], i, j);
         }
       }
     }
@@ -304,7 +414,16 @@ public:
 #ifdef DEBUG
     CheckSorted(q);
 #endif
-    MakePairList(q, particle_number);
+
+#ifdef REFERENCE
+    MakePairListNaive(q, particle_number);
+#elif defined LOOP_FUSION
+    MakePairListFusedLoop(q, particle_number);
+#elif defined SIMD && defined USE_VEC4
+#error "simd version is not implemented yet!"
+    // MakePairListFusedLoopSIMD(q, particle_number);
+#endif
+
     MakeNeighListForEachPtcl(particle_number);
   }
 
@@ -326,5 +445,13 @@ public:
 
   const int32_t* neigh_pointer() const {
     return neigh_pointer_;
+  }
+
+  int32_t* number_of_partners() {
+    return number_of_partners_;
+  }
+
+  const int32_t* number_of_partners() const {
+    return number_of_partners_;
   }
 };
