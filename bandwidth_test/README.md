@@ -4,5 +4,5 @@
 https://github.com/kohnakagawa/code-samples/tree/master/series/cuda-cpp/coalescing-global
 
 ## 結果
-![top-page](https://raw.githubusercontent.com/kohnakagawa/md_neighbor_list/figure/bandwidth.png)
-![top-page](https://raw.githubusercontent.com/kohnakagawa/md_neighbor_list/figure/ratio.png)
+![top-page](https://raw.githubusercontent.com/kohnakagawa/md_neighbor_list/figure/bandwidth_test/bandwidth.png)
+![top-page](https://raw.githubusercontent.com/kohnakagawa/md_neighbor_list/figure/bandwidth_test/ratio.png)
