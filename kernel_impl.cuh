@@ -357,3 +357,71 @@ __global__ void make_neighlist_smem_cell(const Vec* __restrict__ q,
     number_of_partners[tid] = n_neigh;
   }
 }
+
+template <typename Vec, typename Dtype>
+__global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
+                                         const int32_t* __restrict__ cell_id_of_ptcl,
+                                         const int32_t* __restrict__ neigh_cell_id,
+                                         const int32_t* __restrict__ cell_pointer,
+                                         int32_t* __restrict__ neigh_list,
+                                         int32_t* __restrict__ number_of_partners,
+                                         const int32_t smem_loc_hei,
+                                         const Dtype search_length2,
+                                         const int32_t particle_number) {
+  if (smem_loc_hei >= SMEM_MAX_HEI) {
+    printf("smem_loc_hei is too large!\n");
+    printf("smem_loc_hei = %d SMEM_MAX_HEI = %d", smem_loc_hei, SMEM_MAX_HEI);
+    return;
+  }
+
+  extern __shared__ int32_t list_buffer[];
+  const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (tid < particle_number) {
+    const auto qi = q[tid];
+    const auto i_cell_id = cell_id_of_ptcl[tid];
+    const auto tile_offset = smem_loc_hei * SMEM_BLOCK_NUM;
+
+    const int32_t loc_list_beg = smem_tile_beg(tile_offset) + lane_id();
+    int32_t loc_list_idx = loc_list_beg;
+
+    int32_t n_neigh = 0, n_loc_list = 0;
+    bool use_smem = true;
+    for (int32_t cid = 0; cid < 27; cid++) {
+      const auto j_cell_id = neigh_cell_id[27 * i_cell_id + cid];
+      const auto beg_id = cell_pointer[j_cell_id    ];
+      const auto end_id = cell_pointer[j_cell_id + 1];
+      for (int32_t j = beg_id; j < end_id; j++) {
+        const auto drx = qi.x - q[j].x;
+        const auto dry = qi.y - q[j].y;
+        const auto drz = qi.z - q[j].z;
+        const auto dr2 = drx * drx + dry * dry + drz * drz;
+        if (use_smem) {
+          if (dr2 < search_length2 && j != tid) {
+            list_buffer[loc_list_idx] = j;
+            n_loc_list++;
+            loc_list_idx += SMEM_BLOCK_NUM;
+          }
+          if (__any(n_loc_list == smem_loc_hei)) {
+            memcpy_to_gmem(list_buffer,
+                           n_neigh,
+                           neigh_list,
+                           n_loc_list,
+                           tid,
+                           particle_number,
+                           loc_list_beg);
+            n_loc_list = 0;
+            loc_list_idx = loc_list_beg;
+          }
+          use_smem = false;
+        } else {
+          if (dr2 < search_length2 && j != tid) {
+            neigh_list[particle_number * n_neigh + tid] = j;
+            n_neigh++;
+          }
+        }
+      }
+    }
+    number_of_partners[tid] = n_neigh;
+  }
+}
+

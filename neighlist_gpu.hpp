@@ -360,6 +360,23 @@ public:
                                                                          smem_hei,
                                                                          search_length2_,
                                                                          particle_number);
+#elif defined USE_SMEM_ONCE
+    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
+    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem_once<Vec, Dtype>,
+                                             cudaFuncCachePreferShared));
+      is_first = false;
+    }
+    make_neighlist_smem_once<Vec><<<cell_size, tblock_size, smem_size>>>(q,
+                                                                         cell_id_of_ptcl_,
+                                                                         neigh_cell_id_,
+                                                                         cell_pointer_,
+                                                                         neigh_list_,
+                                                                         number_of_partners_,
+                                                                         smem_hei,
+                                                                         search_length2_,
+                                                                         particle_number);
 #endif
 
     if (sync) checkCudaErrors(cudaDeviceSynchronize());

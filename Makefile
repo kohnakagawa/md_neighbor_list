@@ -1,7 +1,7 @@
 PTX = make_list.ptx
 SASS = make_list.sass
 CUBIN = make_list.cubin
-TARGET = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_cell.out make_list_cpu_ref.out make_list_cpu_loop_fused.out
+TARGET = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_cell.out make_list_gpu_smem_once.out make_list_cpu_ref.out make_list_cpu_loop_fused.out
 
 WARNINGS = -Wall -Wextra -Wunused-variable -Wsign-compare
 OPT_FLAGS = -O3
@@ -58,6 +58,9 @@ make_list_gpu_smem_coars.out: make_list.cu
 
 make_list_gpu_smem_cell.out: make_list.cu
 	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_CELL $(INCLUDE) $< $(LIBRARY) -o $@
+
+make_list_gpu_smem_once.out: make_list.cu
+	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_ONCE $(INCLUDE) $< $(LIBRARY) -o $@
 
 make_list_cpu_ref.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DREFERENCE -xHOST -std=c++11 -ipo $< -o $@
