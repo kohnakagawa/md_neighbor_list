@@ -384,14 +384,14 @@ class NeighListSIMD {
 
             const int incr = _popcnt32(hash);
 
-            v4di vj_id = _mm256_set_epi64x(j, j, j, j);
-            v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-            v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
-            vpart_id = _mm256_slli_si256(vpart_id, 4);
+            v4di vj_id        = _mm256_set_epi64x(j, j, j, j);
+            v8si vkey_id      = _mm256_min_epi32(vi_id, vj_id);
+            v8si vpart_id     = _mm256_max_epi32(vi_id, vj_id);
+            vpart_id          = _mm256_slli_si256(vpart_id, 4);
             v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
             // shuffle id and store pair data
-            v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+            v8si idx     = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
             vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
             _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
 
@@ -432,24 +432,27 @@ class NeighListSIMD {
 
           const int incr = _popcnt32(hash);
 
-          v4di vj_id = _mm256_set_epi64x(j, j, j, j);
-          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
-          vpart_id = _mm256_slli_si256(vpart_id, 4);
+          v4di vj_id        = _mm256_set_epi64x(j, j, j, j);
+          v8si vkey_id      = _mm256_min_epi32(vi_id, vj_id);
+          v8si vpart_id     = _mm256_max_epi32(vi_id, vj_id);
+          vpart_id          = _mm256_slli_si256(vpart_id, 4);
           v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
           // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          v8si idx     = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
           vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
           _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
 
           number_of_pairs_ += incr;
         }
 
-        // remaining sequential loop
-        for (int32_t j = i_a + 1; j < i_d + 1; j++) RegistInteractPair(q[i_a], q[j], i_a, j);
-        for (int32_t j = i_b + 1; j < i_d + 1; j++) RegistInteractPair(q[i_b], q[j], i_b, j);
-        for (int32_t j = i_c + 1; j < i_d + 1; j++) RegistInteractPair(q[i_c], q[j], i_c, j);
+        // remaining pairs
+        RegistInteractPair(q[i_a], q[i_a + 1], i_a, i_a + 1);
+        RegistInteractPair(q[i_a], q[i_a + 2], i_a, i_a + 2);
+        RegistInteractPair(q[i_a], q[i_a + 3], i_a, i_a + 3);
+        RegistInteractPair(q[i_b], q[i_b + 1], i_b, i_b + 1);
+        RegistInteractPair(q[i_b], q[i_b + 2], i_b, i_b + 2);
+        RegistInteractPair(q[i_c], q[i_c + 1], i_c, i_c + 1);
       }
 
       // remaining i loop
