@@ -322,6 +322,159 @@ class NeighListSIMD {
     }
   }
 
+  void MakePairListSIMD4x1(const Vec* q,
+                           const int32_t particle_number) {
+    number_of_pairs_ = 0;
+    const v4df vsl2 = _mm256_set_pd(search_length2_,
+                                    search_length2_,
+                                    search_length2_,
+                                    search_length2_);
+    const v4di flag_mask = _mm256_set_epi64x(1L, 1L<<63, 1L, 1L<<63);
+
+    for (int32_t icell = 0; icell < all_cell_; icell++) {
+      const auto icell_beg  = cell_pointer_[icell    ];
+      const auto icell_end  = cell_pointer_[icell + 1];
+      const auto icell_size = icell_end - icell_beg;
+      for (int32_t l = 0; l < (icell_size / 4) * 4; l += 4) {
+        const auto i_a = l + icell_beg;
+        const v4df vqia = _mm256_load_pd(reinterpret_cast<const double*>(q + i_a));
+        const auto i_b = l + icell_beg + 1;
+        const v4df vqib = _mm256_load_pd(reinterpret_cast<const double*>(q + i_b));
+        const auto i_c = l + icell_beg + 2;
+        const v4df vqic = _mm256_load_pd(reinterpret_cast<const double*>(q + i_c));
+        const auto i_d = l + icell_beg + 3;
+        const v4df vqid = _mm256_load_pd(reinterpret_cast<const double*>(q + i_d));
+
+        v4di vi_id = _mm256_set_epi64x(i_a, i_b, i_c, i_d);
+
+        // for different cell
+        for (int32_t k = 0; k < NUM_NEIGH_CELL; k++) {
+          const auto jcell = neigh_cell_id_[NUM_NEIGH_CELL * icell + k];
+          const auto jcell_beg = cell_pointer_[jcell    ];
+          const auto jcell_end = cell_pointer_[jcell + 1];
+          for (int32_t j = jcell_beg; j < jcell_end; j++) {
+            const v4df vqj = _mm256_load_pd(reinterpret_cast<const double*>(q + j));
+
+            v4df dvqa = vqj - vqia;
+            v4df dvqb = vqj - vqib;
+            v4df dvqc = vqj - vqic;
+            v4df dvqd = vqj - vqid;
+
+            // transpose 4x4
+            v4df tmp0 = _mm256_unpacklo_pd(dvqa, dvqb);
+            v4df tmp1 = _mm256_unpackhi_pd(dvqa, dvqb);
+            v4df tmp2 = _mm256_unpacklo_pd(dvqc, dvqd);
+            v4df tmp3 = _mm256_unpackhi_pd(dvqc, dvqd);
+            dvqa = _mm256_permute2f128_pd(tmp0, tmp2, 0x20);
+            dvqb = _mm256_permute2f128_pd(tmp1, tmp3, 0x20);
+            dvqc = _mm256_permute2f128_pd(tmp0, tmp2, 0x31);
+
+            // norm
+            v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
+
+            // dr2 <= search_length2
+            v4di dr2_flag = _mm256_castpd_si256(_mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS));
+
+            // get shfl hash
+            dr2_flag = _mm256_and_si256(dr2_flag, flag_mask);
+            dr2_flag = _mm256_srli_si256(dr2_flag, 7);
+            const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
+
+            if (hash == 0) continue;
+
+            const int incr = _popcnt32(hash);
+
+            v4di vj_id = _mm256_set_epi64x(j, j, j, j);
+            v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
+            v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+            vpart_id = _mm256_slli_si256(vpart_id, 4);
+            v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+
+            // shuffle id and store pair data
+            v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+            vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
+
+            number_of_pairs_ += incr;
+          }
+        }
+
+        // for same cell
+        for (int32_t j = i_d + 1; j < icell_end; j++) {
+          const v4df vqj = _mm256_load_pd(reinterpret_cast<const double*>(q + j));
+
+          v4df dvqa = vqj - vqia;
+          v4df dvqb = vqj - vqib;
+          v4df dvqc = vqj - vqic;
+          v4df dvqd = vqj - vqid;
+
+          // transpose 4x4
+          v4df tmp0 = _mm256_unpacklo_pd(dvqa, dvqb);
+          v4df tmp1 = _mm256_unpackhi_pd(dvqa, dvqb);
+          v4df tmp2 = _mm256_unpacklo_pd(dvqc, dvqd);
+          v4df tmp3 = _mm256_unpackhi_pd(dvqc, dvqd);
+          dvqa = _mm256_permute2f128_pd(tmp0, tmp2, 0x20);
+          dvqb = _mm256_permute2f128_pd(tmp1, tmp3, 0x20);
+          dvqc = _mm256_permute2f128_pd(tmp0, tmp2, 0x31);
+
+          // norm
+          v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
+
+          // dr2 <= search_length2
+          v4di dr2_flag = _mm256_castpd_si256(_mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS));
+
+          // get shfl hash
+          dr2_flag = _mm256_and_si256(dr2_flag, flag_mask);
+          dr2_flag = _mm256_srli_si256(dr2_flag, 7);
+          const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
+
+          if (hash == 0) continue;
+
+          const int incr = _popcnt32(hash);
+
+          v4di vj_id = _mm256_set_epi64x(j, j, j, j);
+          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
+          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+          vpart_id = _mm256_slli_si256(vpart_id, 4);
+          v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+
+          // shuffle id and store pair data
+          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
+          _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
+
+          number_of_pairs_ += incr;
+        }
+
+        // remaining sequential loop
+        for (int32_t j = i_a + 1; j < i_d + 1; j++) RegistInteractPair(q[i_a], q[j], i_a, j);
+        for (int32_t j = i_b + 1; j < i_d + 1; j++) RegistInteractPair(q[i_b], q[j], i_b, j);
+        for (int32_t j = i_c + 1; j < i_d + 1; j++) RegistInteractPair(q[i_c], q[j], i_c, j);
+      }
+
+      // remaining i loop
+      for (int32_t l = (icell_size / 4) * 4; l < icell_size; l++) {
+        const auto i = l + icell_beg;
+        const auto qi = q[i];
+
+        // for different cell
+        for (int32_t k = 0; k < NUM_NEIGH_CELL; k++) {
+          const auto jcell = neigh_cell_id_[NUM_NEIGH_CELL * icell + k];
+          const auto jcell_beg = cell_pointer_[jcell    ];
+          const auto jcell_end = cell_pointer_[jcell + 1];
+          for (int32_t j = jcell_beg; j < jcell_end; j++) {
+            RegistInteractPair(qi, q[j], i, j);
+          }
+        }
+
+        // for same cell
+        for (int32_t j = i + 1; j < icell_end; j++) {
+          RegistInteractPair(qi, q[j], i, j);
+        }
+      }
+    }
+  }
+
   void MakeNeighListForEachPtcl(const int32_t particle_number) {
     std::fill(number_of_partners_,
               number_of_partners_ + particle_number,
@@ -395,7 +548,12 @@ public:
 #ifdef DEBUG
     CheckSorted(q);
 #endif
+
+#ifdef USE4x1
+    MakePairListSIMD4x1(q, particle_number);
+#else
     MakePairListFusedLoopSIMD(q, particle_number);
+#endif
     MakeNeighListForEachPtcl(particle_number);
   }
 
