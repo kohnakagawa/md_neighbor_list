@@ -247,7 +247,6 @@ class NeighListSIMD {
                                     search_length2_,
                                     search_length2_,
                                     search_length2_);
-    const v4di flag_mask = _mm256_set_epi64x(1L, 1L<<63, 1L, 1L<<63);
     for (int32_t icell = 0; icell < all_cell_; icell++) {
       const auto icell_beg = cell_pointer_[icell];
       const auto icell_size = number_in_cell_[icell];
@@ -288,30 +287,28 @@ class NeighListSIMD {
           v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
 
           // dr2 <= search_length2
-          v4di dr2_flag = _mm256_castpd_si256(_mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS));
+          v4df dr2_flag = _mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS);
 
           // get shfl hash
-          dr2_flag = _mm256_and_si256(dr2_flag, flag_mask);
-          dr2_flag = _mm256_srli_si256(dr2_flag, 7);
-          const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
+          const int32_t hash = _mm256_movemask_pd(dr2_flag);
 
-          if (hash != 0) {
-            const int num = _popcnt32(hash);
+          if (hash == 0) continue;
 
-            // key_id < part_id
-            v4di vj_id = _mm256_set_epi64x(ja, jb, jc, jd);
-            v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-            v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
-            vpart_id = _mm256_slli_si256(vpart_id, 4);
-            v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+          const int num = _popcnt32(hash);
 
-            // shuffle id and store pair data
-            v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
-            vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
+          // key_id < part_id
+          v4di vj_id = _mm256_set_epi64x(ja, jb, jc, jd);
+          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
+          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+          vpart_id = _mm256_slli_si256(vpart_id, 4);
+          v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
-            number_of_pairs_ += num;
-          }
+          // shuffle id and store pair data
+          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
+          _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
+
+          number_of_pairs_ += num;
         }
 
         for (int32_t k = (num_loop / 4) * 4; k < num_loop; k++) {
@@ -329,7 +326,6 @@ class NeighListSIMD {
                                     search_length2_,
                                     search_length2_,
                                     search_length2_);
-    const v4di flag_mask = _mm256_set_epi64x(1L, 1L<<63, 1L, 1L<<63);
 
     for (int32_t icell = 0; icell < all_cell_; icell++) {
       const auto icell_beg  = cell_pointer_[icell    ];
@@ -373,12 +369,10 @@ class NeighListSIMD {
             v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
 
             // dr2 <= search_length2
-            v4di dr2_flag = _mm256_castpd_si256(_mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS));
+            v4df dr2_flag = _mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS);
 
             // get shfl hash
-            dr2_flag = _mm256_and_si256(dr2_flag, flag_mask);
-            dr2_flag = _mm256_srli_si256(dr2_flag, 7);
-            const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
+            const int32_t hash = _mm256_movemask_pd(dr2_flag);
 
             if (hash == 0) continue;
 
@@ -421,12 +415,10 @@ class NeighListSIMD {
           v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
 
           // dr2 <= search_length2
-          v4di dr2_flag = _mm256_castpd_si256(_mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS));
+          v4df dr2_flag = _mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS);
 
           // get shfl hash
-          dr2_flag = _mm256_and_si256(dr2_flag, flag_mask);
-          dr2_flag = _mm256_srli_si256(dr2_flag, 7);
-          const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
+          const int32_t hash = _mm256_movemask_pd(dr2_flag);
 
           if (hash == 0) continue;
 
