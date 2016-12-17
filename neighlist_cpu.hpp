@@ -44,25 +44,6 @@ class NeighList {
     PARTNER = 1
   };
 
-  static constexpr int32_t shfl_table_[][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},
-    {6, 7, 0, 0, 0, 0, 0, 0},
-    {4, 5, 0, 0, 0, 0, 0, 0},
-    {4, 5, 6, 7, 0, 0, 0, 0},
-    {2, 3, 0, 0, 0, 0, 0, 0},
-    {2, 3, 6, 7, 0, 0, 0, 0},
-    {2, 3, 4, 5, 0, 0, 0, 0},
-    {2, 3, 4, 5, 6, 7, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 0},
-    {0, 1, 6, 7, 0, 0, 0, 0},
-    {0, 1, 4, 5, 0, 0, 0, 0},
-    {0, 1, 4, 5, 6, 7, 0, 0},
-    {0, 1, 2, 3, 0, 0, 0, 0},
-    {0, 1, 2, 3, 6, 7, 0, 0},
-    {0, 1, 2, 3, 4, 5, 0, 0},
-    {0, 1, 2, 3, 4, 5, 6, 7}
-  };
-
   int32_t GenHash(const int32_t* idx) const {
     const auto ret = idx[0] + (idx[1] + idx[2] * cell_numb_[1]) * cell_numb_[0];
 #ifdef DEBUG
@@ -395,24 +376,24 @@ class NeighList {
           dr2_flag = _mm256_srli_si256(dr2_flag, 7);
           const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
 
-	  const int num = _popcnt32(hash);
+          const int num = _popcnt32(hash);
 
-	  if (num != 0) {
-	    // key_id < part_id
-	    v4di vj_id = _mm256_set_epi64x(ja, jb, jc, jd);
-	    v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-	    v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
-	    vpart_id = _mm256_slli_si256(vpart_id, 4);
-	    v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+          if (num != 0) {
+            // key_id < part_id
+            v4di vj_id = _mm256_set_epi64x(ja, jb, jc, jd);
+            v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
+            v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+            vpart_id = _mm256_slli_si256(vpart_id, 4);
+            v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
-	    // shuffle id and store pair data
-	    v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
-	    vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
-	    _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
+            // shuffle id and store pair data
+            v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+            vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
 
-	    // update
-	    number_of_pairs_ += num;
-	  }
+            // update
+            number_of_pairs_ += num;
+          }
         }
 
         for (int32_t k = (num_loop / 4) * 4; k < num_loop; k++) {
