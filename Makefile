@@ -72,7 +72,7 @@ make_list_cpu_simd.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo $< -o $@
 
 make_list_cpu_simd.s: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo -S $< -o $@
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
 
 clean:
 	rm -f $(TARGET) $(PTX) $(SASS) $(CUBIN) *~ *.core
