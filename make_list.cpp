@@ -3,7 +3,12 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>
+
+#ifdef SIMD
+#include "neighlist_cpu_simd.hpp"
+#else
 #include "neighlist_cpu.hpp"
+#endif
 
 typedef double Dtype;
 
@@ -17,7 +22,7 @@ const Dtype SEARCH_LENGTH = 3.3;
 const Dtype SEARCH_LENGTH2 = SEARCH_LENGTH * SEARCH_LENGTH;
 
 struct Vec {
-#ifdef USE_VEC4
+#ifdef SIMD
   Dtype x, y, z, w;
 #else
   Dtype x, y, z;
@@ -35,7 +40,7 @@ void add_particle(const Dtype x,
   q[particle_number].x = x + ud(mt);
   q[particle_number].y = y + ud(mt);
   q[particle_number].z = z + ud(mt);
-#ifdef USE_VEC4
+#ifdef SIMD
   q[particle_number].w = 0.0;
 #endif
   particle_number++;
@@ -133,7 +138,12 @@ int main(int argc, char* argv[]) {
   }
 
   // make neighbor list
+#ifdef SIMD
+  NeighListSIMD<Vec> nlist(SEARCH_LENGTH, L, L, L);
+#elif defined REFERENCE || defined LOOP_FUSION
   NeighList<Vec> nlist(SEARCH_LENGTH, L, L, L);
+#endif
+
   nlist.Initialize(particle_number);
   const auto beg = std::chrono::system_clock::now();
   for (int i = 0; i < LOOP; i++) {

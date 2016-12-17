@@ -4,9 +4,6 @@
 #include <vector>
 #include <numeric>
 
-#include "dyalloc2d.hpp"
-#include "simd_util.hpp"
-
 template <typename Vec>
 class NeighList {
   bool valid_ = false;
@@ -26,8 +23,6 @@ class NeighList {
   int32_t *neigh_list_ = nullptr, *number_of_partners_ = nullptr;
   int32_t *neigh_pointer_ = nullptr, *neigh_pointer_buf_ = nullptr;
 
-  int32_t **key_partner_particles_ = nullptr;
-
   std::vector<int32_t>* ptcl_id_of_neigh_cell_ = nullptr;
 
   Vec *data_buf_ = nullptr;
@@ -37,11 +32,6 @@ class NeighList {
     SORT_FREQ = 50,
     NUM_NEIGH_CELL = 13,
     NUM_PTCL_IN_NEIGH_CELL = 500,
-  };
-
-  enum : int32_t {
-    KEY = 0,
-    PARTNER = 1
   };
 
   int32_t GenHash(const int32_t* idx) const {
@@ -84,7 +74,6 @@ class NeighList {
     number_of_partners_    = new int32_t [particle_number];
     neigh_pointer_         = new int32_t [particle_number + 1];
     neigh_pointer_buf_     = new int32_t [particle_number + 1];
-    allocate2D(MAX_PARTNERS * particle_number, 2, key_partner_particles_);
     ptcl_id_of_neigh_cell_ = new std::vector<int32_t> [all_cell_];
     data_buf_              = new Vec [particle_number];
     for (int32_t i = 0; i < all_cell_; i++) {
@@ -106,7 +95,6 @@ class NeighList {
     delete [] number_of_partners_;
     delete [] neigh_pointer_;
     delete [] neigh_pointer_buf_;
-    deallocate2D(key_partner_particles_);
     delete [] ptcl_id_of_neigh_cell_;
     delete [] data_buf_;
   }
@@ -245,29 +233,6 @@ class NeighList {
     number_of_pairs_++;
   }
 
-  void RegistInteractPairForSIMDLoop(const Vec& qi,
-				     const Vec& qj,
-				     const int32_t index1,
-				     const int32_t index2) {
-    const auto dx = qj.x - qi.x;
-    const auto dy = qj.y - qi.y;
-    const auto dz = qj.z - qi.z;
-    const auto r2 = dx * dx + dy * dy + dz * dz;
-    if (r2 > search_length2_) return;
-
-    int i, j;
-    if (index1 < index2) {
-      i = index1;
-      j = index2;
-    } else {
-      i = index2;
-      j = index1;
-    }
-    key_partner_particles_[number_of_pairs_][KEY] = i;
-    key_partner_particles_[number_of_pairs_][PARTNER] = j;
-    number_of_pairs_++;
-  }
-
   void MakePairListNaive(const Vec* q,
                          const int32_t particle_number) {
     number_of_pairs_ = 0;
@@ -319,112 +284,6 @@ class NeighList {
         }
       }
     }
-  }
-
-  void MakePairListFusedLoopSIMD(const Vec* q,
-                                 const int32_t particle_number) {
-    MakeNeighCellPtclId();
-    number_of_pairs_ = 0;
-    const v4df vsl2 = _mm256_set_pd(search_length2_,
-                                    search_length2_,
-                                    search_length2_,
-                                    search_length2_);
-    for (int32_t icell = 0; icell < all_cell_; icell++) {
-      const auto icell_beg = cell_pointer_[icell];
-      const auto icell_size = number_in_cell_[icell];
-      const int32_t* pid_of_neigh_cell_loc = &ptcl_id_of_neigh_cell_[icell][0];
-      const int32_t num_of_neigh_cell = ptcl_id_of_neigh_cell_[icell].size();
-      for (int32_t l = 0; l < icell_size; l++) {
-        const auto i = l + icell_beg;
-        const v4df vqi = _mm256_load_pd(reinterpret_cast<const double*>(q + i));
-        v4di vi_id = _mm256_set_epi64x(i, i, i, i);
-        const auto num_loop = num_of_neigh_cell - (l + 1);
-        for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
-          const auto ja = pid_of_neigh_cell_loc[k + l + 1];
-          const v4df vqja = _mm256_load_pd(reinterpret_cast<const double*>(q + ja));
-          v4df dvqa = vqja - vqi;
-
-          const auto jb = pid_of_neigh_cell_loc[k + l + 2];
-          const v4df vqjb = _mm256_load_pd(reinterpret_cast<const double*>(q + jb));
-          v4df dvqb = vqjb - vqi;
-
-          const auto jc = pid_of_neigh_cell_loc[k + l + 3];
-          const v4df vqjc = _mm256_load_pd(reinterpret_cast<const double*>(q + jc));
-          v4df dvqc = vqjc - vqi;
-
-          const auto jd = pid_of_neigh_cell_loc[k + l + 4];
-          const v4df vqjd = _mm256_load_pd(reinterpret_cast<const double*>(q + jd));
-          v4df dvqd = vqjd - vqi;
-
-          // transpose 4x4
-          v4df tmp0 = _mm256_unpacklo_pd(dvqa, dvqb);
-          v4df tmp1 = _mm256_unpackhi_pd(dvqa, dvqb);
-          v4df tmp2 = _mm256_unpacklo_pd(dvqc, dvqd);
-          v4df tmp3 = _mm256_unpackhi_pd(dvqc, dvqd);
-          dvqa = _mm256_permute2f128_pd(tmp0, tmp2, 0x20);
-          dvqb = _mm256_permute2f128_pd(tmp1, tmp3, 0x20);
-          dvqc = _mm256_permute2f128_pd(tmp0, tmp2, 0x31);
-
-          // norm
-          v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
-
-          // dr2 <= search_length2
-          v4di dr2_flag = _mm256_castpd_si256(_mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS));
-
-          // get shfl hash
-          dr2_flag = _mm256_and_si256(dr2_flag, {1L<<63, 1L, 1L<<63, 1L});
-          dr2_flag = _mm256_srli_si256(dr2_flag, 7);
-          const int32_t hash = (_mm256_extract_epi32(dr2_flag, 0) >> 7) + (_mm256_extract_epi32(dr2_flag, 4) >> 5);
-
-          const int num = _popcnt32(hash);
-
-          if (num != 0) {
-            // key_id < part_id
-            v4di vj_id = _mm256_set_epi64x(ja, jb, jc, jd);
-            v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-            v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
-            vpart_id = _mm256_slli_si256(vpart_id, 4);
-            v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
-
-            // shuffle id and store pair data
-            v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
-            vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
-
-            // update
-            number_of_pairs_ += num;
-          }
-        }
-
-        for (int32_t k = (num_loop / 4) * 4; k < num_loop; k++) {
-          const auto j = pid_of_neigh_cell_loc[k + l + 1];
-          RegistInteractPairForSIMDLoop(q[i], q[j], i, j);
-        }
-      }
-    }
-  }
-
-  void MakeNeighListForEachPtclWithoutNumPartner(const int32_t particle_number) {
-    std::fill(number_of_partners_,
-              number_of_partners_ + particle_number,
-              0);
-    for (int32_t i = 0; i < number_of_pairs_; i++) {
-      number_of_partners_[key_partner_particles_[i][KEY]]++;
-    }
-
-    neigh_pointer_[0] = neigh_pointer_buf_[0] = 0;
-    for (int32_t i = 0; i < particle_number; i++) {
-      const auto nei_ptr = neigh_pointer_[i] + number_of_partners_[i];
-      neigh_pointer_[i + 1] = nei_ptr;
-      neigh_pointer_buf_[i + 1] = nei_ptr;
-    }
-
-    for (int32_t i = 0; i < number_of_pairs_; i++) {
-      const auto i_id = key_partner_particles_[i][KEY];
-      neigh_list_[neigh_pointer_buf_[i_id]++] = key_partner_particles_[i][PARTNER];
-    }
-
-    assert(neigh_pointer_[particle_number] == number_of_pairs_);
   }
 
   void MakeNeighListForEachPtcl(const int32_t particle_number) {
@@ -498,15 +357,9 @@ public:
     MakePairListNaive(q, particle_number);
 #elif defined LOOP_FUSION
     MakePairListFusedLoop(q, particle_number);
-#elif defined SIMD && defined USE_VEC4
-    MakePairListFusedLoopSIMD(q, particle_number);
 #endif
 
-#if defined SIMD && defined USE_VEC4
-    MakeNeighListForEachPtclWithoutNumPartner(particle_number);
-#else
     MakeNeighListForEachPtcl(particle_number);
-#endif
   }
 
   int32_t number_of_pairs() const {
