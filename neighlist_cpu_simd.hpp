@@ -505,9 +505,9 @@ class NeighListSIMD {
 
 public:
   NeighListSIMD(const double search_length,
-            const double Lx,
-            const double Ly,
-            const double Lz) {
+                const double Lx,
+                const double Ly,
+                const double Lz) {
     cell_numb_[0] = static_cast<int32_t>(Lx / search_length);
     cell_numb_[1] = static_cast<int32_t>(Ly / search_length);
     cell_numb_[2] = static_cast<int32_t>(Lz / search_length);
