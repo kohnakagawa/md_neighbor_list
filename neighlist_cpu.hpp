@@ -420,7 +420,7 @@ public:
     CheckSorted(q);
 #endif
 
-#ifdef REFERENCE
+#ifdef WITHOUT_LOOP_FUSION
     MakePairListNaive(q, particle_number);
 #elif defined LOOP_FUSION
     MakePairListFusedLoop(q, particle_number);
