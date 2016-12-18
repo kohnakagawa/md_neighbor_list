@@ -474,9 +474,20 @@ class NeighListSIMD {
     std::fill(number_of_partners_,
               number_of_partners_ + particle_number,
               0);
-    for (int32_t i = 0; i < number_of_pairs_; i++) {
-      number_of_partners_[key_partner_particles_[i][KEY]]++;
+
+    auto k0 = key_partner_particles_[0][KEY];
+    auto n0 = number_of_partners_[k0];
+    for (int32_t i = 1; i < number_of_pairs_; i++) {
+      n0++;
+      number_of_partners_[k0] = n0;
+
+      auto k1 = key_partner_particles_[i][KEY];
+      auto n1 = number_of_partners_[k1];
+      k0 = k1;
+      n0 = n1;
     }
+    n0++;
+    number_of_partners_[k0] = n0;
 
     neigh_pointer_[0] = neigh_pointer_buf_[0] = 0;
     for (int32_t i = 0; i < particle_number; i++) {
@@ -485,10 +496,26 @@ class NeighListSIMD {
       neigh_pointer_buf_[i + 1] = nei_ptr;
     }
 
-    for (int32_t i = 0; i < number_of_pairs_; i++) {
-      const auto i_id = key_partner_particles_[i][KEY];
-      neigh_list_[neigh_pointer_buf_[i_id]++] = key_partner_particles_[i][PARTNER];
+    auto id_k0 = key_partner_particles_[0][KEY];
+    auto id_p0 = key_partner_particles_[0][PARTNER];
+    auto next_dst0 = neigh_pointer_buf_[id_k0];
+    for (int32_t i = 1; i < number_of_pairs_; i++) {
+      // store  incr
+      neigh_list_[next_dst0] = id_p0;
+      neigh_pointer_buf_[id_k0] = next_dst0 + 1;
+
+      // load next data
+      auto id_k1 = key_partner_particles_[i][KEY];
+      auto id_p1 = key_partner_particles_[i][PARTNER];
+      auto next_dst1 = neigh_pointer_buf_[id_k1];
+
+      id_k0 = id_k1;
+      id_p0 = id_p1;
+      next_dst0 = next_dst1;
     }
+    // store incr
+    neigh_list_[next_dst0] = id_p0;
+    neigh_pointer_buf_[id_k0] = next_dst0 + 1;
 
 #ifdef DEBUG
     assert(neigh_pointer_[particle_number] == number_of_pairs_);
