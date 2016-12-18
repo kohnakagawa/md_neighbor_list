@@ -286,6 +286,73 @@ class NeighList {
     }
   }
 
+  void MakePairListFusedLoopSwp(const Vec* q,
+                                const int32_t particle_number) {
+    MakeNeighCellPtclId();
+    number_of_pairs_ = 0;
+    std::fill(number_of_partners_,
+              number_of_partners_ + particle_number,
+              0);
+    for (int32_t icell = 0; icell < all_cell_; icell++) {
+      const auto icell_beg = cell_pointer_[icell];
+      const auto icell_size = number_in_cell_[icell];
+      const int32_t* pid_of_neigh_cell_loc = &ptcl_id_of_neigh_cell_[icell][0];
+      const int32_t num_of_neigh_cell = ptcl_id_of_neigh_cell_[icell].size();
+      for (int32_t l = 0; l < icell_size; l++) {
+        const auto i = l + icell_beg;
+        const auto qi = q[i];
+
+        auto j_0  = pid_of_neigh_cell_loc[l + 1];
+        auto dx = q[j_0].x - qi.x;
+        auto dy = q[j_0].y - qi.y;
+        auto dz = q[j_0].z - qi.z;
+        auto r2_0 = dx * dx + dy * dy + dz * dz;
+
+        for (int32_t k = l + 2; k < num_of_neigh_cell; k++) {
+          if (r2_0 > search_length2_) goto NEXT;
+
+          // store load incr
+          int id_k, id_p;
+          if (i < j_0) {
+            id_k = i;
+            id_p = j_0;
+          } else {
+            id_k = j_0;
+            id_p = i;
+          }
+          key_particles_[number_of_pairs_]     = id_k;
+          partner_particles_[number_of_pairs_] = id_p;
+          number_of_partners_[id_k]++;
+          number_of_pairs_++;
+
+        NEXT:
+          const auto j_1 = pid_of_neigh_cell_loc[k];
+          dx = q[j_1].x - qi.x;
+          dy = q[j_1].y - qi.y;
+          dz = q[j_1].z - qi.z;
+          const auto r2_1 = dx * dx + dy * dy + dz * dz;
+
+          j_0  = j_1;
+          r2_0 = r2_1;
+        }
+        if (r2_0 <= search_length2_) {
+          int id_k, id_p;
+          if (i < j_0) {
+            id_k = i;
+            id_p = j_0;
+          } else {
+            id_k = j_0;
+            id_p = i;
+          }
+          key_particles_[number_of_pairs_]     = id_k;
+          partner_particles_[number_of_pairs_] = id_p;
+          number_of_partners_[id_k]++;
+          number_of_pairs_++;
+        }
+      }
+    }
+  }
+
   void MakeNeighListForEachPtcl(const int32_t particle_number) {
     neigh_pointer_[0] = neigh_pointer_buf_[0] = 0;
     for (int32_t i = 0; i < particle_number; i++) {
@@ -357,6 +424,8 @@ public:
     MakePairListNaive(q, particle_number);
 #elif defined LOOP_FUSION
     MakePairListFusedLoop(q, particle_number);
+#elif defined LOOP_FUSION_SWP
+    MakePairListFusedLoopSwp(q, particle_number);
 #endif
 
     MakeNeighListForEachPtcl(particle_number);

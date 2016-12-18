@@ -2,7 +2,7 @@ PTX = make_list.ptx
 SASS = make_list.sass
 CUBIN = make_list.cubin
 ASM = make_list_cpu_simd.s make_list_cpu_simd4x1.s
-CPU = make_list_cpu_ref.out make_list_cpu_loop_fused.out make_list_cpu_simd.out make_list_cpu_simd4x1.out
+CPU = make_list_cpu_ref.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out make_list_cpu_simd.out make_list_cpu_simd4x1.out
 GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_cell.out make_list_gpu_smem_once.out
 TARGET = $(CPU) $(GPU)
 
@@ -73,6 +73,9 @@ make_list_cpu_ref.out: make_list.cpp
 
 make_list_cpu_loop_fused.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DLOOP_FUSION -xHOST -std=c++11 -ipo $< -o $@
+
+make_list_cpu_loop_fused_swp.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DLOOP_FUSION_SWP -xHOST -std=c++11 -ipo $< -o $@
 
 make_list_cpu_simd.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo $< -o $@

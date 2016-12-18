@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
   // make neighbor list
 #ifdef SIMD
   NeighListSIMD<Vec> nlist(SEARCH_LENGTH, L, L, L);
-#elif defined REFERENCE || defined LOOP_FUSION
+#else
   NeighList<Vec> nlist(SEARCH_LENGTH, L, L, L);
 #endif
 
