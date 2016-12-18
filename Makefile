@@ -97,8 +97,9 @@ gpu_bench: make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out
 	./make_list_gpu_roc.out
 	./make_list_gpu_smem.out
 
-cpu_bench: make_list_cpu_ref.out make_list_cpu_loop_fused.out make_list_cpu_simd.out make_list_cpu_simd4x1.out
-	./make_list_cpu_ref.out
+cpu_bench: make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out make_list_cpu_simd.out make_list_cpu_simd4x1.out
+	./make_list_cpu_no_loop_fused.out
 	./make_list_cpu_loop_fused.out
+	./make_list_cpu_loop_fused_swp.out
 	./make_list_cpu_simd.out
 	./make_list_cpu_simd4x1.out
