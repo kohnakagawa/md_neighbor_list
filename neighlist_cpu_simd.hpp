@@ -216,16 +216,8 @@ class NeighListSIMD {
     }
   }
 
-  void RegistInteractPair(const Vec& qi,
-                          const Vec& qj,
-                          const int32_t index1,
-                          const int32_t index2) {
-    const auto dx = qj.x - qi.x;
-    const auto dy = qj.y - qi.y;
-    const auto dz = qj.z - qi.z;
-    const auto r2 = dx * dx + dy * dy + dz * dz;
-    if (r2 > search_length2_) return;
-
+  void RegistPair(const int32_t index1,
+                  const int32_t index2) {
     int i, j;
     if (index1 < index2) {
       i = index1;
@@ -237,6 +229,19 @@ class NeighListSIMD {
     key_partner_particles_[number_of_pairs_][KEY] = i;
     key_partner_particles_[number_of_pairs_][PARTNER] = j;
     number_of_pairs_++;
+  }
+
+  void RegistInteractPair(const Vec& qi,
+                          const Vec& qj,
+                          const int32_t index1,
+                          const int32_t index2) {
+    const auto dx = qj.x - qi.x;
+    const auto dy = qj.y - qi.y;
+    const auto dz = qj.z - qi.z;
+    const auto r2 = dx * dx + dy * dy + dz * dz;
+    if (r2 > search_length2_) return;
+
+    RegistPair(index1, index2);
   }
 
   void MakePairListFusedLoopSIMD(const Vec* q,
@@ -385,6 +390,85 @@ class NeighListSIMD {
           _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]), vpart_key_id);
 
           number_of_pairs_ += incr;
+        }
+
+        // remaining pairs
+        RegistInteractPair(q[i_a], q[i_a + 1], i_a, i_a + 1);
+        RegistInteractPair(q[i_a], q[i_a + 2], i_a, i_a + 2);
+        RegistInteractPair(q[i_a], q[i_a + 3], i_a, i_a + 3);
+        RegistInteractPair(q[i_b], q[i_b + 1], i_b, i_b + 1);
+        RegistInteractPair(q[i_b], q[i_b + 2], i_b, i_b + 2);
+        RegistInteractPair(q[i_c], q[i_c + 1], i_c, i_c + 1);
+      }
+
+      // remaining i loop
+      for (int32_t l = (icell_size / 4) * 4; l < icell_size; l++) {
+        const auto i = l + icell_beg;
+        const auto qi = q[i];
+        for (int32_t k = l + 1; k < num_of_neigh_cell; k++) {
+          const auto j = pid_of_neigh_cell_loc[k];
+          RegistInteractPair(qi, q[j], i, j);
+        }
+      }
+    }
+  }
+
+    void MakePairListFusedLoopSIMD4x1SeqStore(const Vec* q,
+                                              const int32_t particle_number) {
+    MakeNeighCellPtclId();
+    number_of_pairs_ = 0;
+    const v4df vsl2 = _mm256_set_pd(search_length2_,
+                                    search_length2_,
+                                    search_length2_,
+                                    search_length2_);
+    for (int32_t icell = 0; icell < all_cell_; icell++) {
+      const auto icell_beg = cell_pointer_[icell    ];
+      const auto icell_end = cell_pointer_[icell + 1];
+      const auto icell_size = icell_end - icell_beg;
+      const int32_t* pid_of_neigh_cell_loc = &ptcl_id_of_neigh_cell_[icell][0];
+      const int32_t num_of_neigh_cell = ptcl_id_of_neigh_cell_[icell].size();
+      for (int32_t l = 0; l < (icell_size / 4) * 4 ; l += 4) {
+        const auto i_a = l + icell_beg;
+        const v4df vqia = _mm256_load_pd(reinterpret_cast<const double*>(q + i_a));
+        const auto i_b = l + icell_beg + 1;
+        const v4df vqib = _mm256_load_pd(reinterpret_cast<const double*>(q + i_b));
+        const auto i_c = l + icell_beg + 2;
+        const v4df vqic = _mm256_load_pd(reinterpret_cast<const double*>(q + i_c));
+        const auto i_d = l + icell_beg + 3;
+        const v4df vqid = _mm256_load_pd(reinterpret_cast<const double*>(q + i_d));
+        for (int32_t k = l + 4; k < num_of_neigh_cell; k++) {
+          const auto j = pid_of_neigh_cell_loc[k];
+          const v4df vqj = _mm256_load_pd(reinterpret_cast<const double*>(q + j));
+          v4df dvqa = vqj - vqia;
+          v4df dvqb = vqj - vqib;
+          v4df dvqc = vqj - vqic;
+          v4df dvqd = vqj - vqid;
+
+          // transpose 4x4
+          v4df tmp0 = _mm256_unpacklo_pd(dvqa, dvqb);
+          v4df tmp1 = _mm256_unpackhi_pd(dvqa, dvqb);
+          v4df tmp2 = _mm256_unpacklo_pd(dvqc, dvqd);
+          v4df tmp3 = _mm256_unpackhi_pd(dvqc, dvqd);
+          dvqa = _mm256_permute2f128_pd(tmp0, tmp2, 0x20);
+          dvqb = _mm256_permute2f128_pd(tmp1, tmp3, 0x20);
+          dvqc = _mm256_permute2f128_pd(tmp0, tmp2, 0x31);
+
+          // norm
+          v4df dr2_abc = dvqa * dvqa + dvqb * dvqb + dvqc * dvqc;
+
+          // dr2 <= search_length2
+          v4df dr2_flag = _mm256_cmp_pd(dr2_abc, vsl2, _CMP_LE_OS);
+
+          // get shfl hash
+          int32_t hash = _mm256_movemask_pd(dr2_flag);
+
+          if (hash & 1) RegistPair(i_a, j);
+          hash >>= 1;
+          if (hash & 1) RegistPair(i_b, j);
+          hash >>= 1;
+          if (hash & 1) RegistPair(i_c, j);
+          hash >>= 1;
+          if (hash & 1) RegistPair(i_d, j);
         }
 
         // remaining pairs
@@ -753,6 +837,8 @@ public:
     MakePairListSIMD4x1(q, particle_number);
 #elif defined FUSED_LOOP_USE4x1
     MakePairListFusedLoopSIMD4x1(q, particle_number);
+#elif defined FUSED_LOOP_SEQ
+    MakePairListFusedLoopSIMD4x1SeqStore(q, particle_number);
 #else
     MakePairListFusedLoopSIMD(q, particle_number);
 #endif
