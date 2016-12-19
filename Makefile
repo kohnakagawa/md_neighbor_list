@@ -83,6 +83,9 @@ make_list_cpu_simd.out: make_list.cpp
 make_list_cpu_simd4x1.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DUSE4x1 -xHOST -std=c++11 -ipo $< -o $@
 
+make_list_cpu_simd4x1_loop_fused.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DFUSED_LOOP_USE4x1 -xHOST -std=c++11 -ipo $< -o $@
+
 make_list_cpu_simd.s: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
 
@@ -103,3 +106,4 @@ cpu_bench: make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_lis
 	./make_list_cpu_loop_fused_swp.out
 	./make_list_cpu_simd.out
 	./make_list_cpu_simd4x1.out
+	./make_list_cpu_simd4x1_loop_fused.out
