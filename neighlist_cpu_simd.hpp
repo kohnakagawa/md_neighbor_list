@@ -462,6 +462,8 @@ class NeighListSIMD {
           // get shfl hash
           int32_t hash = _mm256_movemask_pd(dr2_flag);
 
+          if (hash == 0) continue;
+
           if (hash & 1) RegistPair(i_a, j);
           hash >>= 1;
           if (hash & 1) RegistPair(i_b, j);

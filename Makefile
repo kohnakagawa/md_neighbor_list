@@ -5,7 +5,7 @@ ASM = make_list_cpu_simd.s make_list_cpu_simd4x1.s
 CPU = make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out
 CPU_SIMD = make_list_cpu_simd.out make_list_cpu_simd4x1.out make_list_cpu_simd4x1_loop_fused.out make_list_cpu_simd4x1_loop_fused_seq.out
 GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_cell.out make_list_gpu_smem_once.out
-TARGET = $(CPU) $(GPU)
+TARGET = $(CPU) $(GPU) $(CPU_SIMD)
 
 WARNINGS = -Wall -Wextra -Wunused-variable -Wsign-compare
 OPT_FLAGS = -O3
@@ -28,7 +28,7 @@ endif
 ICC = icpc
 
 all: $(TARGET)
-cpu: $(CPU)
+cpu: $(CPU) $(CPU_SIMD)
 gpu: $(GPU)
 asm: $(ASM)
 sass: $(SASS)
