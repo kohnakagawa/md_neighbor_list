@@ -309,23 +309,22 @@ class NeighList {
         auto r2_0 = dx * dx + dy * dy + dz * dz;
 
         for (int32_t k = l + 2; k < num_of_neigh_cell; k++) {
-          if (r2_0 > search_length2_) goto NEXT;
-
-          // store load incr
-          int id_k, id_p;
-          if (i < j_0) {
-            id_k = i;
-            id_p = j_0;
-          } else {
-            id_k = j_0;
-            id_p = i;
+          if (r2_0 <= search_length2_) {
+            // store load incr
+            int id_k, id_p;
+            if (i < j_0) {
+              id_k = i;
+              id_p = j_0;
+            } else {
+              id_k = j_0;
+              id_p = i;
+            }
+            key_particles_[number_of_pairs_]     = id_k;
+            partner_particles_[number_of_pairs_] = id_p;
+            number_of_partners_[id_k]++;
+            number_of_pairs_++;
           }
-          key_particles_[number_of_pairs_]     = id_k;
-          partner_particles_[number_of_pairs_] = id_p;
-          number_of_partners_[id_k]++;
-          number_of_pairs_++;
 
-        NEXT:
           const auto j_1 = pid_of_neigh_cell_loc[k];
           dx = q[j_1].x - qi.x;
           dy = q[j_1].y - qi.y;
