@@ -482,7 +482,7 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
         const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
         const uint32_t flag = __ballot(in_range);
         if (in_range) {
-          const uint32_t mask = (0xffffffff >> (31 - lid));
+          const uint32_t mask   = (0xffffffff >> (31 - lid));
           const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
           neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
         }
@@ -499,7 +499,7 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
         const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
         const uint32_t flag = __ballot(in_range);
         if (in_range) {
-          const uint32_t mask = (0xffffffff >> (31 - lid));
+          const uint32_t mask   = (0xffffffff >> (31 - lid));
           const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
           neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
         }
@@ -507,6 +507,101 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
       }
       n_neigh = __shfl(n_neigh, 0);
     }
+
+    if (lid == 0) number_of_partners[i_ptcl_id] = n_neigh;
+  }
+}
+
+template <int MAX_PTCL_NUM_IN_NCELL>
+__global__ void make_ptcl_id_of_neigh_cell(const int32_t* __restrict__ cell_id_of_ptcl,
+                                           const int32_t* __restrict__ neigh_cell_id,
+                                           const int32_t* __restrict__ cell_pointer,
+                                           int32_t* __restrict__ num_of_ptcl_in_neigh_cell,
+                                           int32_t* __restrict__ ptcl_id_of_neigh_cell,
+                                           const int32_t tot_cell_num) {
+  const auto i_cell_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
+  if (i_cell_id < tot_cell_num) {
+    const auto lid = lane_id();
+    int32_t* loc_id = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
+
+    int32_t n_neigh = 0;
+    for (int32_t cid = 0; cid < 27; cid++) {
+      const auto j_cell_id    = neigh_cell_id[27 * i_cell_id + cid];
+      const auto beg_id       = cell_pointer[j_cell_id];
+      const auto num_loop     = cell_pointer[j_cell_id + 1] - beg_id;
+      const auto num_loop_ini = (num_loop / warpSize) * warpSize;
+
+      int32_t j = 0;
+      for (; j < num_loop_ini; j += warpSize) {
+        loc_id[n_neigh + lid] = beg_id + j + lid;
+        n_neigh += warpSize;
+      }
+
+      const auto remaining_loop = num_loop % warpSize;
+      if (lid < remaining_loop) {
+        loc_id[n_neigh + lid] = beg_id + j + lid;
+      }
+      n_neigh += remaining_loop;
+    }
+
+    if (lid == 0) num_of_ptcl_in_neigh_cell[i_cell_id] = n_neigh;
+  }
+}
+
+template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NCELL>
+__global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
+                                                      const int32_t* __restrict__ cell_id_of_ptcl,
+                                                      const int32_t* __restrict__ num_of_ptcl_in_neigh_cell,
+                                                      const int32_t* __restrict__ ptcl_id_of_neigh_cell,
+                                                      int32_t* __restrict__ neigh_list_buf,
+                                                      int32_t* __restrict__ number_of_partners,
+                                                      const Dtype search_length2,
+                                                      const int32_t max_partners,
+                                                      const int32_t particle_number) {
+  const auto i_ptcl_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
+  if (i_ptcl_id < particle_number) {
+    const auto qi        = q[i_ptcl_id];
+    const auto i_cell_id = cell_id_of_ptcl[i_ptcl_id];
+    const auto lid       = lane_id();
+    int32_t n_neigh      = 0;
+
+    const int32_t* loc_id = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
+    const auto num_loop     = num_of_ptcl_in_neigh_cell[i_cell_id];
+    const auto num_loop_ini = (num_loop / warpSize) * warpSize;
+    int32_t j               = 0;
+    for (; j < num_loop_ini; j += warpSize) {
+      const auto j_ptcl_id = loc_id[j + lid];
+      const auto drx = qi.x - q[j_ptcl_id].x;
+      const auto dry = qi.y - q[j_ptcl_id].y;
+      const auto drz = qi.z - q[j_ptcl_id].z;
+      const auto dr2 = drx * drx + dry * dry + drz * drz;
+      const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
+      const uint32_t flag = __ballot(in_range);
+      if (in_range) {
+        const uint32_t mask   = (0xffffffff >> (31 - lid));
+        const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
+        neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
+      }
+      n_neigh += __popc(flag);
+    }
+
+    // remaining loop
+    if (lid < (num_loop % warpSize)) {
+      const auto j_ptcl_id = loc_id[j + lid];
+      const auto drx = qi.x - q[j_ptcl_id].x;
+      const auto dry = qi.y - q[j_ptcl_id].y;
+      const auto drz = qi.z - q[j_ptcl_id].z;
+      const auto dr2 = drx * drx + dry * dry + drz * drz;
+      const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
+      const uint32_t flag = __ballot(in_range);
+      if (in_range) {
+        const uint32_t mask   = (0xffffffff >> (31 - lid));
+        const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
+        neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
+      }
+      n_neigh += __popc(flag);
+    }
+    n_neigh = __shfl(n_neigh, 0);
 
     if (lid == 0) number_of_partners[i_ptcl_id] = n_neigh;
   }
