@@ -41,7 +41,7 @@ $(CUBIN): make_list.cu
 .SUFFIXES:
 .SUFFIXES: .cu .cubin
 .cu.cubin:
-	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM $(INCLUDE) -cubin $< $(LIBRARY) -o $@
+	$(NVCC) $(NVCCFLAGS) -DUSE_MATRIX_TRANSPOSE $(INCLUDE) -cubin $< $(LIBRARY) -o $@
 
 .SUFFIXES: .cubin .sass
 .cubin.sass:
@@ -49,7 +49,7 @@ $(CUBIN): make_list.cu
 
 .SUFFIXES: .cu .ptx
 .cu.ptx:
-	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM $(INCLUDE) -ptx $< $(LIBRARY) -o $@
+	$(NVCC) $(NVCCFLAGS) -DUSE_MATRIX_TRANSPOSE $(INCLUDE) -ptx $< $(LIBRARY) -o $@
 
 make_list_gpu_ref.out: make_list.cu
 	$(NVCC) $(NVCCFLAGS) -DREFERENCE $(INCLUDE) $< $(LIBRARY) -o $@
