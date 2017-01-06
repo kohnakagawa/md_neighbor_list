@@ -114,15 +114,11 @@ make_list_cpu_simd4x1.s: make_list.cpp
 clean:
 	rm -f $(TARGET) $(PTX) $(SASS) $(CUBIN) $(ASM) *~ *.core
 
-gpu_bench: make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out
+gpu_bench: make_list_gpu_ref.out make_list_gpu_smem.out make_list_gpu_warp_unroll_fused_loop.out
 	./make_list_gpu_ref.out
-	./make_list_gpu_roc.out
 	./make_list_gpu_smem.out
+	./make_list_gpu_warp_unroll_fused_loop.out
 
-cpu_bench: make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out make_list_cpu_simd.out make_list_cpu_simd4x1.out make_list_cpu_simd4x1_loop_fused.out
-	./make_list_cpu_no_loop_fused.out
+cpu_bench: make_list_cpu_loop_fused.out make_list_cpu_simd4x1_loop_fused_trans_swp.out
 	./make_list_cpu_loop_fused.out
-	./make_list_cpu_loop_fused_swp.out
-	./make_list_cpu_simd.out
-	./make_list_cpu_simd4x1.out
-	./make_list_cpu_simd4x1_loop_fused.out
+	./make_list_cpu_simd4x1_loop_fused_trans_swp.out

@@ -1,4 +1,4 @@
-# SIMTization of neighbor list construction for molecular dynamics simulations
+# SIMTization and SIMDization of Verlet list construction for molecular dynamics simulations
 
 ## Usage
     $ make cpu_bench
