@@ -3,7 +3,13 @@
 #include <algorithm>
 #include <chrono>
 
+#if 1
 typedef double Dtype;
+typedef double4 Vectype;
+#else
+typedef float Dtype;
+typedef float4 Dtype;
+#endif
 
 #include "cuda_ptr.cuh"
 #include "neighlist_gpu.hpp"
@@ -104,20 +110,20 @@ int main(int argc, char* argv[]) {
   }
 
   // buffer data
-  cuda_ptr<double4> q_d4, p_d4;
-  q_d4.allocate(N); p_d4.allocate(N);
+  cuda_ptr<Vectype> q, p;
+  q.allocate(N); p.allocate(N);
 
   // initialize and copy to device
   int particle_number = 0;
-  init(&q_d4[0], particle_number);
-  q_d4.host2dev();
+  init(&q[0], particle_number);
+  q.host2dev();
 
   // run gpu nearlist construction
-  NeighListGPU<double4, double> nlistmaker(SEARCH_LENGTH, L, L, L);
+  NeighListGPU<Vectype, Dtype> nlistmaker(SEARCH_LENGTH, L, L, L);
   nlistmaker.Initialize(particle_number);
   const auto beg = std::chrono::system_clock::now();
   for (int i = 0; i < LOOP; i++) {
-    nlistmaker.MakeNeighList(q_d4, p_d4, particle_number, false, tblock_size, smem_hei);
+    nlistmaker.MakeNeighList(q, p, particle_number, false, tblock_size, smem_hei);
   }
   checkCudaErrors(cudaDeviceSynchronize());
   const auto end = std::chrono::system_clock::now();
@@ -133,13 +139,13 @@ int main(int argc, char* argv[]) {
   // copy to host
   neigh_list.dev2host();
   number_of_partners.dev2host();
-  q_d4.dev2host();
+  q.dev2host();
 
   // run cpu reference
   std::vector<int> neigh_list_ref, number_of_partners_ref;
   neigh_list_ref.resize(particle_number * MAX_NEIGH_N, -1);
   number_of_partners_ref.resize(particle_number, -1);
-  make_neighlist_bruteforce(&q_d4[0],
+  make_neighlist_bruteforce(&q[0],
                             particle_number,
                             neigh_list_ref,
                             number_of_partners_ref);
