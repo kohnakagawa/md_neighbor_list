@@ -23,7 +23,7 @@ ifeq ($(cuda_profile), yes)
 NVCCFLAGS += -lineinfo -Xptxas -v
 endif
 
-# LIBRARY = -L$(BOOST_ROOT)/lib -lboost_system -lboost_program_options
+LIBRARY = -lcublas
 
 ICC = icpc
 
@@ -70,7 +70,7 @@ make_list_gpu_smem_once.out: make_list.cu
 	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_ONCE $(INCLUDE) $< $(LIBRARY) -o $@
 
 make_list_gpu_warp_unroll.out: make_list.cu
-	$(NVCC) $(NVCCFLAGS) -DUSE_MATRIX_TRANSPOSE $(INCLUDE) $< -lcublas -o $@
+	$(NVCC) $(NVCCFLAGS) -DUSE_MATRIX_TRANSPOSE $(INCLUDE) $< $(LIBRARY) -o $@
 
 make_list_cpu_no_loop_fused.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DWITHOUT_LOOP_FUSION -xHOST -std=c++11 -ipo $< -o $@
