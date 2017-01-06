@@ -36,3 +36,19 @@ int get_min_in_warp(int val) {
   return val;
 }
 
+#include <cublas_v2.h>
+
+static inline void __cublasSafeCall(cublasStatus_t err,
+                                    const char *file,
+                                    const int line)
+{
+  if (CUBLAS_STATUS_SUCCESS != err) {
+    fprintf(stderr, "CUBLAS error in file '%s', line %d\n \nerror %d \nterminating!\n",__FILE__, __LINE__,err);
+    cudaDeviceReset();
+    assert(0);
+  }
+}
+
+#ifndef cublasSafeCall
+#define cublasSafeCall(err)     __cublasSafeCall(err, __FILE__, __LINE__)
+#endif

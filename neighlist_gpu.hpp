@@ -46,12 +46,16 @@ class NeighListGPU {
   Dtype search_length_ = 0.0, search_length2_ = 0.0;
 
   int32_t nmax_in_cell_ = 0;
+  int32_t tot_max_partner_number_ = 0;
   cuda_ptr<int32_t> cell_id_of_ptcl_, neigh_cell_id_, cell_pointer_, number_in_cell_;
   cuda_ptr<int32_t> ptcl_id_in_cell_;
   cuda_ptr<int32_t> neigh_list_, number_of_partners_;
 
   thrust::device_ptr<Vec> buffer_;
   thrust::device_ptr<int> uni_vect_, out_key_;
+  thrust::device_ptr<int32_t> neigh_list_buf_;
+
+  int32_t* neigh_list_buf_raw_ = nullptr;
 
   enum : int32_t {
     MAX_PARTNERS = 400,
@@ -77,6 +81,8 @@ class NeighListGPU {
   }
 
   void Allocate(const int32_t particle_number) {
+    tot_max_partner_number_ = MAX_PARTNERS * particle_number;
+
     cell_id_of_ptcl_.allocate(particle_number);
     neigh_cell_id_.allocate(27 * all_cell_);
     cell_pointer_.allocate(all_cell_ + 1);
@@ -84,15 +90,18 @@ class NeighListGPU {
     ptcl_id_in_cell_.allocate(particle_number);
     neigh_list_.allocate(MAX_PARTNERS * particle_number);
     number_of_partners_.allocate(particle_number);
-    buffer_   = thrust::device_new<Vec>(particle_number);
-    uni_vect_ = thrust::device_new<int>(particle_number);
-    out_key_  = thrust::device_new<int>(particle_number);
+    buffer_         = thrust::device_new<Vec>(particle_number);
+    uni_vect_       = thrust::device_new<int>(particle_number);
+    out_key_        = thrust::device_new<int>(particle_number);
+    neigh_list_buf_ = thrust::device_new<int32_t>(particle_number * MAX_PARTNERS);
+    neigh_list_buf_raw_ = thrust::raw_pointer_cast(neigh_list_buf_);
   }
 
   void Deallocate() {
     thrust::device_delete(buffer_);
     thrust::device_delete(uni_vect_);
     thrust::device_delete(out_key_);
+    thrust::device_delete(neigh_list_buf_);
   }
 
   void MakeNeighCellId() {
@@ -247,6 +256,9 @@ public:
     Allocate(particle_number);
 
     neigh_list_.set_val(-1);
+    thrust::fill(neigh_list_buf_,
+                 neigh_list_buf_ + tot_max_partner_number_,
+                 -1);
     number_of_partners_.set_val(0);
     cell_pointer_.set_val(0);
     thrust::fill(uni_vect_, uni_vect_ + particle_number, 1);
@@ -377,6 +389,27 @@ public:
                                                                          smem_hei,
                                                                          search_length2_,
                                                                          particle_number);
+#elif defined USE_MATRIX_TRANSPOSE
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll<Vec, Dtype>,
+                                             cudaFuncCachePreferL1));
+      is_first = false;
+    }
+
+    const auto grid_size = (particle_number - 1) / (tblock_size / 32) + 1;
+    make_neighlist_warp_unroll<Vec><<<grid_size, tblock_size>>>(q,
+                                                                cell_id_of_ptcl_,
+                                                                neigh_cell_id_,
+                                                                cell_pointer_,
+                                                                neigh_list_buf_raw_,
+                                                                number_of_partners_,
+                                                                search_length2_,
+                                                                MAX_PARTNERS,
+                                                                particle_number);
+    transpose_neighlist(neigh_list_buf_raw_,
+                        neigh_list_,
+                        particle_number,
+                        MAX_PARTNERS);
 #endif
 
     if (sync) checkCudaErrors(cudaDeviceSynchronize());
