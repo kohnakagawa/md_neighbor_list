@@ -1,0 +1,15 @@
+GPU-STREAM
+Device: Tesla K40t
+Version: 2.1
+Implementation: CUDA
+Running kernels 100 times
+Precision: double
+Array size: 268.4 MB (=0.3 GB)
+Total size: 805.3 MB (=0.8 GB)
+Using CUDA device Tesla K40t
+Driver: 7000
+Function    MBytes/sec  Min (sec)   Max         Average     
+Copy        194368.093  0.00276     0.00277     0.00277     
+Mul         194232.797  0.00276     0.00278     0.00277     
+Add         191037.367  0.00422     0.00422     0.00422     
+Triad       190922.373  0.00422     0.00422     0.00422     
