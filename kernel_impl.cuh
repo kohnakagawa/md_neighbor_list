@@ -607,15 +607,6 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
   }
 }
 
-template <typename T>
-void memcpy_d2s(const T* __restrict__ dmem,
-                T* __restrict__ smem,
-                const int num) {
-#pragma unroll
-  for (int i = 0; i < num; i++)
-    smem[i] = dmem[i];
-}
-
 template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NCELL>
 __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict__ q,
                                                           const int32_t* __restrict__ num_of_ptcl_in_neigh_cell,
@@ -629,10 +620,161 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
                                                           const int32_t particle_number) {
   const auto i_cell_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
   if (i_cell_id < tot_cell_num) {
-    const auto beg_id = cell_pointer[i_cell_id    ];
-    const auto end_id = cell_pointer[i_cell_id + 1];
+    const auto beg_id         = cell_pointer[i_cell_id];
+    const auto num_i_loop     = cell_pointer[i_cell_id + 1] - beg_id;
+    const auto num_i_loop_ini = (num_i_loop >> 2) << 2;
 
-    for (int i_ptcl_id = beg_id; i_ptcl_id < end_id; i_ptcl_id++) {
+    int32_t i = 0;
+    for (; i < num_i_loop_ini; i += 4) {
+      const auto i_ptcl_id0 = beg_id + i;
+      const auto i_ptcl_id1 = i_ptcl_id0 + 1;
+      const auto i_ptcl_id2 = i_ptcl_id0 + 2;
+      const auto i_ptcl_id3 = i_ptcl_id0 + 3;
+
+      const auto qi0       = q[i_ptcl_id0];
+      const auto qi1       = q[i_ptcl_id1];
+      const auto qi2       = q[i_ptcl_id2];
+      const auto qi3       = q[i_ptcl_id3];
+
+      const auto lid       = lane_id();
+      int32_t n_neigh0 = 0, n_neigh1 = 0, n_neigh2 = 0, n_neigh3 = 0;
+
+      int32_t* neigh_list_buf_loc0 = &neigh_list_buf[i_ptcl_id0 * max_partners];
+      int32_t* neigh_list_buf_loc1 = &neigh_list_buf[i_ptcl_id1 * max_partners];
+      int32_t* neigh_list_buf_loc2 = &neigh_list_buf[i_ptcl_id2 * max_partners];
+      int32_t* neigh_list_buf_loc3 = &neigh_list_buf[i_ptcl_id3 * max_partners];
+
+      const int32_t* loc_id     = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
+      const auto num_j_loop     = num_of_ptcl_in_neigh_cell[i_cell_id];
+      const auto num_j_loop_ini = (num_j_loop / warpSize) * warpSize;
+      const uint32_t mask       = (0xffffffff >> (31 - lid));
+
+      int32_t j = 0;
+      for (; j < num_j_loop_ini; j += warpSize) {
+        const auto j_ptcl_id = loc_id[j + lid];
+        const auto qj = q[j_ptcl_id];
+
+        const auto drx0  = qi0.x - qj.x;
+        const auto dry0  = qi0.y - qj.y;
+        const auto drz0  = qi0.z - qj.z;
+        const auto dr2_0 = drx0 * drx0 + dry0 * dry0 + drz0 * drz0;
+
+        const auto drx1  = qi1.x - qj.x;
+        const auto dry1  = qi1.y - qj.y;
+        const auto drz1  = qi1.z - qj.z;
+        const auto dr2_1 = drx1 * drx1 + dry1 * dry1 + drz1 * drz1;
+
+        const auto drx2  = qi2.x - qj.x;
+        const auto dry2  = qi2.y - qj.y;
+        const auto drz2  = qi2.z - qj.z;
+        const auto dr2_2 = drx2 * drx2 + dry2 * dry2 + drz2 * drz2;
+
+        const auto drx3  = qi3.x - qj.x;
+        const auto dry3  = qi3.y - qj.y;
+        const auto drz3  = qi3.z - qj.z;
+        const auto dr2_3 = drx3 * drx3 + dry3 * dry3 + drz3 * drz3;
+
+        int32_t in_range = (dr2_0 <= search_length2) && (i_ptcl_id0 != j_ptcl_id);
+        uint32_t flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh0 - 1;
+          neigh_list_buf_loc0[str_dst] = j_ptcl_id;
+        }
+        n_neigh0 += __popc(flag);
+
+        in_range = (dr2_1 <= search_length2) && (i_ptcl_id1 != j_ptcl_id);
+        flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh1 - 1;
+          neigh_list_buf_loc1[str_dst] = j_ptcl_id;
+        }
+        n_neigh1 += __popc(flag);
+
+        in_range = (dr2_2 <= search_length2) && (i_ptcl_id2 != j_ptcl_id);
+        flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh2 - 1;
+          neigh_list_buf_loc2[str_dst] = j_ptcl_id;
+        }
+        n_neigh2 += __popc(flag);
+
+        in_range = (dr2_3 <= search_length2) && (i_ptcl_id3 != j_ptcl_id);
+        flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh3 - 1;
+          neigh_list_buf_loc3[str_dst] = j_ptcl_id;
+        }
+        n_neigh3 += __popc(flag);
+      }
+
+      // remaining loop
+      if (lid < (num_j_loop - num_j_loop_ini)) {
+        const auto j_ptcl_id = loc_id[j + lid];
+        const auto qj = q[j_ptcl_id];
+
+        const auto drx0  = qi0.x - qj.x;
+        const auto dry0  = qi0.y - qj.y;
+        const auto drz0  = qi0.z - qj.z;
+        const auto dr2_0 = drx0 * drx0 + dry0 * dry0 + drz0 * drz0;
+
+        const auto drx1  = qi1.x - qj.x;
+        const auto dry1  = qi1.y - qj.y;
+        const auto drz1  = qi1.z - qj.z;
+        const auto dr2_1 = drx1 * drx1 + dry1 * dry1 + drz1 * drz1;
+
+        const auto drx2  = qi2.x - qj.x;
+        const auto dry2  = qi2.y - qj.y;
+        const auto drz2  = qi2.z - qj.z;
+        const auto dr2_2 = drx2 * drx2 + dry2 * dry2 + drz2 * drz2;
+
+        const auto drx3  = qi3.x - qj.x;
+        const auto dry3  = qi3.y - qj.y;
+        const auto drz3  = qi3.z - qj.z;
+        const auto dr2_3 = drx3 * drx3 + dry3 * dry3 + drz3 * drz3;
+
+        int32_t in_range = (dr2_0 <= search_length2) && (i_ptcl_id0 != j_ptcl_id);
+        uint32_t flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh0 - 1;
+          neigh_list_buf_loc0[str_dst] = j_ptcl_id;
+        }
+        n_neigh0 += __popc(flag);
+
+        in_range = (dr2_1 <= search_length2) && (i_ptcl_id1 != j_ptcl_id);
+        flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh1 - 1;
+          neigh_list_buf_loc1[str_dst] = j_ptcl_id;
+        }
+        n_neigh1 += __popc(flag);
+
+        in_range = (dr2_2 <= search_length2) && (i_ptcl_id2 != j_ptcl_id);
+        flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh2 - 1;
+          neigh_list_buf_loc2[str_dst] = j_ptcl_id;
+        }
+        n_neigh2 += __popc(flag);
+
+        in_range = (dr2_3 <= search_length2) && (i_ptcl_id3 != j_ptcl_id);
+        flag = __ballot(in_range);
+        if (in_range) {
+          const int32_t str_dst = __popc(flag & mask) + n_neigh3 - 1;
+          neigh_list_buf_loc3[str_dst] = j_ptcl_id;
+        }
+        n_neigh3 += __popc(flag);
+      }
+
+      if (lid == 0) {
+        number_of_partners[i_ptcl_id0] = n_neigh0;
+        number_of_partners[i_ptcl_id1] = n_neigh1;
+        number_of_partners[i_ptcl_id2] = n_neigh2;
+        number_of_partners[i_ptcl_id3] = n_neigh3;
+      }
+    }
+
+    for (; i < num_i_loop; i++) {
+      const auto i_ptcl_id = beg_id + i;
       const auto qi        = q[i_ptcl_id];
       const auto lid       = lane_id();
       int32_t n_neigh      = 0;
