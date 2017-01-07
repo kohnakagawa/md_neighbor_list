@@ -565,10 +565,13 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
     const auto lid       = lane_id();
     int32_t n_neigh      = 0;
 
-    const int32_t* loc_id = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
-    const auto num_loop     = num_of_ptcl_in_neigh_cell[i_cell_id];
-    const auto num_loop_ini = (num_loop / warpSize) * warpSize;
-    int32_t j               = 0;
+    const int32_t* loc_id       = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
+    int32_t* neigh_list_buf_loc = &neigh_list_buf[i_ptcl_id * max_partners];
+    const auto num_loop         = num_of_ptcl_in_neigh_cell[i_cell_id];
+    const auto num_loop_ini     = (num_loop / warpSize) * warpSize;
+    const uint32_t mask         = (0xffffffff >> (31 - lid));
+
+    int32_t j = 0;
     for (; j < num_loop_ini; j += warpSize) {
       const auto j_ptcl_id = loc_id[j + lid];
       const auto drx = qi.x - q[j_ptcl_id].x;
@@ -578,9 +581,8 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
       const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
       const uint32_t flag = __ballot(in_range);
       if (in_range) {
-        const uint32_t mask   = (0xffffffff >> (31 - lid));
         const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-        neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
+        neigh_list_buf_loc[str_dst] = j_ptcl_id;
       }
       n_neigh += __popc(flag);
     }
@@ -595,9 +597,8 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
       const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
       const uint32_t flag = __ballot(in_range);
       if (in_range) {
-        const uint32_t mask   = (0xffffffff >> (31 - lid));
         const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-        neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
+        neigh_list_buf_loc[str_dst] = j_ptcl_id;
       }
       n_neigh += __popc(flag);
     }
