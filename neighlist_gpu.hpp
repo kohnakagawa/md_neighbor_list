@@ -446,6 +446,36 @@ public:
                         neigh_list_,
                         particle_number,
                         MAX_PARTNERS);
+#elif defined USE_MATRIX_TRANSPOSE_LOOP_FUSED_REV
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll_loop_fused<Vec, Dtype, 27 * NMAX_IN_CELL>,
+                                             cudaFuncCachePreferL1));
+      is_first = false;
+    }
+    auto grid_size = (all_cell_ - 1) / (tblock_size / 32) + 1;
+    make_ptcl_id_of_neigh_cell<27 * NMAX_IN_CELL><<<grid_size, tblock_size>>>(cell_id_of_ptcl_,
+                                                                              neigh_cell_id_,
+                                                                              cell_pointer_,
+                                                                              thrust::raw_pointer_cast(num_of_ptcl_in_neigh_cell_),
+                                                                              thrust::raw_pointer_cast(ptcl_id_of_neigh_cell_),
+                                                                              all_cell_);
+    grid_size = (all_cell_ - 1) / (tblock_size / 32) + 1;
+    make_neighlist_warp_unroll_loop_fused_rev<Vec,
+                                              Dtype,
+                                              27 * NMAX_IN_CELL><<<grid_size, tblock_size>>>(q,
+                                                                                             thrust::raw_pointer_cast(num_of_ptcl_in_neigh_cell_),
+                                                                                             thrust::raw_pointer_cast(ptcl_id_of_neigh_cell_),
+                                                                                             cell_pointer_,
+                                                                                             thrust::raw_pointer_cast(neigh_list_buf_),
+                                                                                             number_of_partners_,
+                                                                                             search_length2_,
+                                                                                             all_cell_,
+                                                                                             MAX_PARTNERS,
+                                                                                             particle_number);
+    transpose_neighlist(thrust::raw_pointer_cast(neigh_list_buf_),
+                        neigh_list_,
+                        particle_number,
+                        MAX_PARTNERS);
 #endif
 
     if (sync) checkCudaErrors(cudaDeviceSynchronize());
