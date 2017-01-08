@@ -59,7 +59,7 @@ class NeighListGPU {
   thrust::device_ptr<int32_t> ptcl_id_of_neigh_cell_;
 
   enum : int32_t {
-    MAX_PARTNERS = 400,
+    MAX_PARTNERS = 200,
     SORT_FREQ = 50,
     WARP_SIZE = 32,
     NMAX_IN_CELL = 70,
@@ -364,8 +364,7 @@ public:
                                                                           particle_number);
 #elif defined USE_SMEM_CELL
     tblock_size = ((nmax_in_cell_ - 1) / WARP_SIZE + 1) * WARP_SIZE;
-    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
-    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
+    const int32_t smem_size = nmax_in_cell_ * sizeof(Vec);
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem_cell<Vec, Dtype>,
                                              cudaFuncCachePreferShared));
