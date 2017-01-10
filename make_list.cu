@@ -8,7 +8,7 @@ typedef double Dtype;
 typedef double4 Vectype;
 #else
 typedef float Dtype;
-typedef float4 Dtype;
+typedef float4 Vectype;
 #endif
 
 #include "cuda_ptr.cuh"
