@@ -5,7 +5,8 @@
 #include <chrono>
 
 #ifdef SIMD
-#include "neighlist_cpu_simd.hpp"
+#include "neighlist_cpu_avx.hpp"
+//#include "neighlist_cpu_avx512.hpp"
 #else
 #include "neighlist_cpu.hpp"
 #endif
