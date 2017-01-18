@@ -56,6 +56,22 @@ static inline void transpose_4x4x2(const v8df& va,
   vz = _mm512_permutex2var_pd(t_a, _mm512_set_epi64(0xf, 0xe, 0x7, 0x6, 0xb, 0xa, 0x3, 0x2), t_c);
 }
 
+static inline void transpose_4x4(const v4df& va,
+                                 const v4df& vb,
+                                 const v4df& vc,
+                                 const v4df& vd,
+                                 v4df& vx,
+                                 v4df& vy,
+                                 v4df& vz) {
+  v4df tmp0 = _mm256_unpacklo_pd(va, vb);
+  v4df tmp1 = _mm256_unpackhi_pd(va, vb);
+  v4df tmp2 = _mm256_unpacklo_pd(vc, vd);
+  v4df tmp3 = _mm256_unpackhi_pd(vc, vd);
+  vx = _mm256_permute2f128_pd(tmp0, tmp2, 0x20);
+  vy = _mm256_permute2f128_pd(tmp1, tmp3, 0x20);
+  vz = _mm256_permute2f128_pd(tmp0, tmp2, 0x31);
+}
+
 static inline v8df _mm512_rot_rshift_b64(const v8df& a,
                                          const int shift) {
   return _mm512_castsi512_pd(_mm512_alignr_epi64(_mm512_castpd_si512(a),

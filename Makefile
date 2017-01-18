@@ -3,9 +3,11 @@ SASS = make_list.sass
 CUBIN = make_list.cubin
 ASM = make_list_cpu_simd.s make_list_cpu_simd4x1.s
 CPU = make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out
-CPU_SIMD = make_list_cpu_simd.out make_list_cpu_simd4x1.out make_list_cpu_simd4x1_loop_fused.out make_list_cpu_simd4x1_loop_fused_trans_swp.out make_list_cpu_simd_loop_fused_seq.out make_list_cpu_simd4x1_loop_fused_seq.out make_list_cpu_simd4x1_loop_fused_trans.out
+AVX2 = make_list_cpu_simd1x4.out make_list_cpu_simd4x1.out make_list_cpu_simd1x4_seq.out make_list_cpu_simd4x1_seq.out
+AVX512 = make_list_cpu_simd1x8.out make_list_cpu_simd8x1.out
+
 GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_cell.out make_list_gpu_smem_once.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out make_list_gpu_warp_unroll_fused_loop_rev.out
-TARGET = $(CPU) $(GPU) $(CPU_SIMD)
+TARGET = $(CPU)
 
 WARNINGS = -Wall -Wextra -Wunused-variable -Wsign-compare
 OPT_FLAGS = -O3
@@ -28,7 +30,9 @@ LIBRARY = -lcublas
 ICC = icpc
 
 all: $(TARGET)
-cpu: $(CPU) $(CPU_SIMD)
+cpu: $(CPU)
+haswell: $(AVX2)
+mic: $(AVX512)
 gpu: $(GPU)
 asm: $(ASM)
 sass: $(SASS)
@@ -87,41 +91,38 @@ make_list_cpu_loop_fused.out: make_list.cpp
 make_list_cpu_loop_fused_swp.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DLOOP_FUSION_SWP -xHOST -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo $< -o $@
+make_list_cpu_simd1x4.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DUSE1x4 -xHOST -std=c++11 -ipo $< -o $@
 
 make_list_cpu_simd4x1.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DUSE4x1 -xHOST -std=c++11 -ipo $< -o $@
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DUSE4x1 -xHOST -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd4x1_loop_fused.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DFUSED_LOOP_USE4x1 -xHOST -std=c++11 -ipo $< -o $@
+make_list_cpu_simd1x4_seq.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DSEQ_USE1x4 -xHOST -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd_loop_fused_seq.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DFUSED_LOOP_SEQ -xHOST -std=c++11 -ipo $< -o $@
+make_list_cpu_simd4x1_seq.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DSEQ_USE4x1 -xHOST -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd4x1_loop_fused_seq.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DFUSED_LOOP_SEQ_USE4x1 -xHOST -std=c++11 -ipo $< -o $@
+make_list_cpu_simd1x8.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX512 -DUSE1x8 -xMIC-AVX512 -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd4x1_loop_fused_trans.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DFUSED_LOOP_USE4x1_TRANSPOSE -xHOST -std=c++11 -ipo $< -o $@
-
-make_list_cpu_simd4x1_loop_fused_trans_swp.out: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DFUSED_LOOP_USE4x1_TRANSPOSE_SWP -xHOST -std=c++11 -ipo $< -o $@
+make_list_cpu_simd8x1.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX512 -DUSE8x1 -xMIC-AVX512 -std=c++11 -ipo $< -o $@
 
 make_list_cpu_simd.s: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
 
 make_list_cpu_simd4x1.s: make_list.cpp
-	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DSIMD -DUSE4x1 -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DUSE4x1 -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
 
 clean:
-	rm -f $(TARGET) $(PTX) $(SASS) $(CUBIN) $(ASM) *~ *.core
+	rm -f $(PTX) $(SASS) $(CUBIN) $(ASM) $(CPU) $(AVX2) $(AVX512) $(GPU) *~ *.core
 
 gpu_bench: make_list_gpu_ref.out make_list_gpu_smem.out make_list_gpu_warp_unroll_fused_loop.out
 	./make_list_gpu_ref.out
 	./make_list_gpu_smem.out
 	./make_list_gpu_warp_unroll_fused_loop.out
 
-cpu_bench: make_list_cpu_loop_fused.out make_list_cpu_simd4x1_loop_fused_trans_swp.out
+cpu_bench: make_list_cpu_loop_fused.out make_list_cpu_simd4x1.out
 	./make_list_cpu_loop_fused.out
-	./make_list_cpu_simd4x1_loop_fused_trans_swp.out
+	./make_list_cpu_simd4x1.out

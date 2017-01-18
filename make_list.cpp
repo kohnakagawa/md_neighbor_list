@@ -4,9 +4,10 @@
 #include <algorithm>
 #include <chrono>
 
-#ifdef SIMD
-#include "neighlist_cpu_avx.hpp"
-//#include "neighlist_cpu_avx512.hpp"
+#ifdef USE_AVX512
+#include "neighlist_cpu_avx512.hpp"
+#elif USE_AVX2
+#include "neighlist_cpu_avx2.hpp"
 #else
 #include "neighlist_cpu.hpp"
 #endif
@@ -23,7 +24,7 @@ const Dtype SEARCH_LENGTH = 3.3;
 const Dtype SEARCH_LENGTH2 = SEARCH_LENGTH * SEARCH_LENGTH;
 
 struct Vec {
-#ifdef SIMD
+#if defined USE_AVX512 || defined USE_AVX2
   Dtype x, y, z, w;
 #else
   Dtype x, y, z;
@@ -41,7 +42,7 @@ void add_particle(const Dtype x,
   q[particle_number].x = x + ud(mt);
   q[particle_number].y = y + ud(mt);
   q[particle_number].z = z + ud(mt);
-#ifdef SIMD
+#if defined USE_AVX512 || defined USE_AVX2
   q[particle_number].w = 0.0;
 #endif
   particle_number++;
@@ -139,8 +140,10 @@ int main(int argc, char* argv[]) {
   }
 
   // make neighbor list
-#ifdef SIMD
-  NeighListSIMD<Vec> nlist(SEARCH_LENGTH, L, L, L);
+#ifdef USE_AVX512
+  NeighListAVX512<Vec> nlist(SEARCH_LENGTH, L, L, L);
+#elif USE_AVX2
+  NeighListAVX2<Vec> nlist(SEARCH_LENGTH, L, L, L);
 #else
   NeighList<Vec> nlist(SEARCH_LENGTH, L, L, L);
 #endif

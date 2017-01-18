@@ -258,7 +258,7 @@ class NeighListAVX512 {
     RegistPair(index1, index2);
   }
 
-  void MakePairListFusedLoopSIMD1x8(const Vec* q,
+  void MakePairListSIMD1x8(const Vec* q,
                                     const int32_t particle_number) {
     MakeNeighCellPtclId();
     number_of_pairs_ = 0;
@@ -359,7 +359,7 @@ class NeighListAVX512 {
     RegistPairSIMD(dr2_flag, vi_id, vj_id);
   }
 
-  void MakePairListFusedLoopSIMD8x1(const Vec* q,
+  void MakePairListSIMD8x1(const Vec* q,
                                     const int32_t particle_number) {
     MakeNeighCellPtclId();
     number_of_pairs_ = 0;
@@ -557,10 +557,10 @@ public:
     CheckSorted(q);
 #endif
 
-#ifdef FUSED_LOOP_USE8x1
-    MakePairListFusedLoopSIMD8x1(q, particle_number);
-#elif defined FUSED_LOOP_USE1x8
-    MakePairListFusedLoopSIMD1x8(q, particle_number);
+#ifdef USE8x1
+    MakePairListSIMD8x1(q, particle_number);
+#elif defined USE1x8
+    MakePairListSIMD1x8(q, particle_number);
 #endif
     MakeNeighListForEachPtcl(particle_number);
   }
