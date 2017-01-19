@@ -11,7 +11,7 @@
 template <typename Vec>
 class NeighListAVX512 {
   bool valid_ = false;
-  int32_t cell_numb_[3], all_cell_ = -1;
+  int32_t cell_numb_[3] {0}, all_cell_ = -1;
   Vec cell_leng_, inv_cell_leng_;
   double search_length_  = 0.0, search_length2_ = 0.0;
 
