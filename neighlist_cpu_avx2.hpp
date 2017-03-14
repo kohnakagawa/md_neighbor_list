@@ -522,6 +522,7 @@ class NeighListAVX2 {
     MakeNeighCellPtclId();
     number_of_pairs_ = 0;
     const v4df vsl2 = _mm256_set1_pd(search_length2_);
+    const v4di vpn  = _mm256_set1_epi64x(pn);
     for (int32_t icell = 0; icell < all_cell_; icell++) {
       const auto icell_beg = cell_pointer_[icell    ];
       const auto icell_end = cell_pointer_[icell + 1];
@@ -539,12 +540,17 @@ class NeighListAVX2 {
         v4df vqic = _mm256_load_pd(&q[i_c].x);
         v4df vqid = _mm256_load_pd(&q[i_d].x);
 
+        v4di vi_id = _mm256_set_epi64x(i_d, i_c, i_b, i_a);
+
         v4df vqix, vqiy, vqiz;
         transpose_4x4(vqia, vqib, vqic, vqid, vqix, vqiy, vqiz);
 
-        v4di vi_id = _mm256_set_epi64x(i_d, i_c, i_b, i_a);
+        int i_less_than_pn = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpgt_epi64(vpn, vi_id)));
+
         for (int32_t k = l + 4; k < num_of_neigh_cell; k++) {
-          const auto j = pid_of_neigh_cell_loc[k];
+          const auto    j = pid_of_neigh_cell_loc[k];
+          const int32_t j_less_than_pn = (j < pn) ? 0xf : 0;
+
           v4df vqjx = _mm256_set1_pd(q[j].x);
           v4df vqjy = _mm256_set1_pd(q[j].y);
           v4df vqjz = _mm256_set1_pd(q[j].z);
@@ -557,11 +563,10 @@ class NeighListAVX2 {
           v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          int32_t dr2_flag = _mm256_movemask_pd(_mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS));
 
           // get shfl hash
-          const int32_t hash = _mm256_movemask_pd(dr2_flag);
-
+          const int32_t hash = (i_less_than_pn | j_less_than_pn) & dr2_flag;
           if (hash == 0) continue;
 
           const int incr = _popcnt32(hash);
@@ -581,75 +586,31 @@ class NeighListAVX2 {
 
           number_of_pairs_ += incr;
         }
+
         // remaining pairs
-        RegistInteractPair(q[i_a], q[i_b], i_a, i_b);
-        RegistInteractPair(q[i_a], q[i_c], i_a, i_c);
-        RegistInteractPair(q[i_a], q[i_d], i_a, i_d);
-        RegistInteractPair(q[i_b], q[i_c], i_b, i_c);
-        RegistInteractPair(q[i_b], q[i_d], i_b, i_d);
-        RegistInteractPair(q[i_c], q[i_d], i_c, i_d);
+        if (i_a < pn || i_b < pn) RegistInteractPair(q[i_a], q[i_b], i_a, i_b);
+        if (i_a < pn || i_c < pn) RegistInteractPair(q[i_a], q[i_c], i_a, i_c);
+        if (i_a < pn || i_d < pn) RegistInteractPair(q[i_a], q[i_d], i_a, i_d);
+        if (i_b < pn || i_c < pn) RegistInteractPair(q[i_b], q[i_c], i_b, i_c);
+        if (i_b < pn || i_d < pn) RegistInteractPair(q[i_b], q[i_d], i_b, i_d);
+        if (i_c < pn || i_d < pn) RegistInteractPair(q[i_c], q[i_d], i_c, i_d);
       }
 
       // remaining i loop
       for (int32_t l = (icell_size / 4) * 4; l < icell_size; l++) {
         const auto i = l + icell_beg;
-        v4df vqix = _mm256_set1_pd(q[i].x);
-        v4df vqiy = _mm256_set1_pd(q[i].y);
-        v4df vqiz = _mm256_set1_pd(q[i].z);
-        v4di vi_id = _mm256_set1_epi64x(i);
-
-        const auto num_loop = num_of_neigh_cell - (l + 1);
-        for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
-          const auto ja = pid_of_neigh_cell_loc[k + l + 1];
-          const auto jb = pid_of_neigh_cell_loc[k + l + 2];
-          const auto jc = pid_of_neigh_cell_loc[k + l + 3];
-          const auto jd = pid_of_neigh_cell_loc[k + l + 4];
-
-          v4df vqja = _mm256_load_pd(&q[ja].x);
-          v4df vqjb = _mm256_load_pd(&q[jb].x);
-          v4df vqjc = _mm256_load_pd(&q[jc].x);
-          v4df vqjd = _mm256_load_pd(&q[jd].x);
-
-          v4df vqjx, vqjy, vqjz;
-          transpose_4x4(vqja, vqjb, vqjc, vqjd,
-                        vqjx, vqjy, vqjz);
-
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
-
-          // norm
-          v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
-
-          // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
-
-          // get shfl hash
-          const int32_t hash = _mm256_movemask_pd(dr2_flag);
-
-          if (hash == 0) continue;
-
-          const int incr = _popcnt32(hash);
-
-          // key_id < part_id
-          v4di vj_id = _mm256_set_epi64x(jd, jc, jb, ja);
-          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
-          vpart_id = _mm256_slli_si256(vpart_id, 4);
-          v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
-
-          // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
-          vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
-          _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]),
-                              vpart_key_id);
-
-          number_of_pairs_ += incr;
-        }
-
-        for (int32_t k = (num_loop / 4) * 4; k < num_loop; k++) {
-          const auto j = pid_of_neigh_cell_loc[k + l + 1];
-          RegistInteractPair(q[i], q[j], i, j);
+        const double x1 = q[i].x;
+        const double y1 = q[i].y;
+        const double z1 = q[i].z;
+        for (int32_t k = l + 1; k < num_of_neigh_cell; k++) {
+          const auto j = pid_of_neigh_cell_loc[k];
+          if (i >= pn && j >= pn) continue;
+          const double dx = x1 - q[j].x;
+          const double dy = y1 - q[j].y;
+          const double dz = z1 - q[j].z;
+          const double r2 = (dx * dx + dy * dy + dz * dz);
+          if (r2 > search_length2_) continue;
+          RegistPair(i, j);
         }
       }
     }

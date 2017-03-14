@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <chrono>
 
+const int pn = 70000;
+
 #ifdef USE_AVX512
 #include "neighlist_cpu_avx512.hpp"
 #elif USE_AVX2
@@ -84,6 +86,7 @@ void make_neighlist_bruteforce(const Vec* q,
   for (int i = 0; i < particle_number; i++) {
     int n_neigh = 0;
     for (int j = i + 1; j < particle_number; j++) {
+      if (i >= pn && j >= pn) continue;
       const auto qi = q[i];
       const auto qj = q[j];
       const auto drx = qj.x - qi.x;

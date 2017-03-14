@@ -280,6 +280,7 @@ class NeighList {
         const auto qi = q[i];
         for (int32_t k = l + 1; k < num_of_neigh_cell; k++) {
           const auto j = pid_of_neigh_cell_loc[k];
+          if (i >= pn && j >= pn) continue;
           RegistInteractPair(qi, q[j], i, j);
         }
       }
