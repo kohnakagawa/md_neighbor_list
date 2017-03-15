@@ -545,7 +545,7 @@ class NeighListAVX2 {
         v4df vqix, vqiy, vqiz;
         transpose_4x4(vqia, vqib, vqic, vqid, vqix, vqiy, vqiz);
 
-        int i_less_than_pn = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpgt_epi64(vpn, vi_id)));
+        int32_t i_less_than_pn = _mm256_movemask_pd(_mm256_castsi256_pd(_mm256_cmpgt_epi64(vpn, vi_id)));
 
         for (int32_t k = l + 4; k < num_of_neigh_cell; k++) {
           const auto    j = pid_of_neigh_cell_loc[k];
