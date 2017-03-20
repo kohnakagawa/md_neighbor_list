@@ -563,10 +563,11 @@ class NeighListAVX2 {
           v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
 
           // dr2 <= search_length2
-          int32_t dr2_flag = _mm256_movemask_pd(_mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS));
+          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          int32_t less_than_sl2 = _mm256_movemask_pd(dr2_flag);
 
           // get shfl hash
-          const int32_t hash = (i_less_than_pn | j_less_than_pn) & dr2_flag;
+          const int32_t hash = (i_less_than_pn | j_less_than_pn) & less_than_sl2;
           if (hash == 0) continue;
 
           const int incr = _popcnt32(hash);
