@@ -323,36 +323,6 @@ class NeighListAVX512 {
     }
   }
 
-  void RegistRemainingPair(const v8df& vqix,
-                           const v8df& vqiy,
-                           const v8df& vqiz,
-                           v8df& vqjx,
-                           v8df& vqjy,
-                           v8df& vqjz,
-                           v8di& vi_id,
-                           v8di& vj_id,
-                           const v8df& vsl2,
-                           const int32_t mask) {
-    vqjx  = _mm512_rot_rshift_b64(vqjx, 1);
-    vqjy  = _mm512_rot_rshift_b64(vqjy, 1);
-    vqjz  = _mm512_rot_rshift_b64(vqjz, 1);
-    vj_id = _mm512_rot_rshift_b64(vj_id, 1);
-
-    v8df dvx = vqjx - vqix;
-    v8df dvy = vqjy - vqiy;
-    v8df dvz = vqjz - vqiz;
-
-    // norm
-    v8df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
-
-    // dr2 <= search_length2
-    __mmask8 dr2_flag = _mm512_cmple_pd_mask(dr2, vsl2) & mask;
-
-    if (dr2_flag == 0) return;
-
-    RegistPairSIMD(dr2_flag, vi_id, vj_id);
-  }
-
   void MakePairListSIMD8x1(const Vec* q,
                                     const int32_t particle_number) {
     MakeNeighMeshPtclId();
