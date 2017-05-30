@@ -17,7 +17,7 @@ typedef double Dtype;
 const Dtype density = 1.0;
 const int N = 400000; // maximum buffer size
 const int MAX_NEIGH_N = 200;
-const int LOOP = 100;
+const int LOOP = 5;
 const Dtype L = 50.0;
 
 const Dtype SEARCH_LENGTH = 3.3;
@@ -158,8 +158,8 @@ int main(int argc, char* argv[]) {
   std::cout << "# of particles " << particle_number
             << " " << elapsed << "[ms]\n";
   const auto number_of_pairs = nlist.number_of_pairs();
-  int32_t* neigh_list  = nlist.neigh_list();
-  int32_t* neigh_pointer = nlist.neigh_pointer();
+  int32_t* neigh_list  = nlist.sorted_list();
+  int32_t* neigh_pointer = nlist.key_pointer();
   const int32_t* number_of_partners = nlist.number_of_partners();
 
   // reference
