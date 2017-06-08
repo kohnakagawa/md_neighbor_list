@@ -6,7 +6,7 @@ CPU = make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu
 AVX2 = make_list_cpu_simd1x4.out make_list_cpu_simd4x1.out make_list_cpu_simd1x4_seq.out make_list_cpu_simd4x1_seq.out
 AVX512 = make_list_cpu_simd1x8.out make_list_cpu_simd8x1.out
 
-GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_cell.out make_list_gpu_smem_once.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out make_list_gpu_warp_unroll_fused_loop_rev.out
+GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out make_list_gpu_smem_coars.out make_list_gpu_smem_mesh.out make_list_gpu_smem_once.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out make_list_gpu_warp_unroll_fused_loop_rev.out
 TARGET = $(CPU)
 
 WARNINGS = -Wall -Wextra -Wunused-variable -Wsign-compare
@@ -67,8 +67,8 @@ make_list_gpu_smem.out: make_list.cu
 make_list_gpu_smem_coars.out: make_list.cu
 	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_COARS $(INCLUDE) $< $(LIBRARY) -o $@
 
-make_list_gpu_smem_cell.out: make_list.cu
-	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_CELL $(INCLUDE) $< $(LIBRARY) -o $@
+make_list_gpu_smem_mesh.out: make_list.cu
+	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_MESH $(INCLUDE) $< $(LIBRARY) -o $@
 
 make_list_gpu_smem_once.out: make_list.cu
 	$(NVCC) $(NVCCFLAGS) -DUSE_SMEM_ONCE $(INCLUDE) $< $(LIBRARY) -o $@

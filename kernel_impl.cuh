@@ -2,29 +2,29 @@
 
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_naive(const Vec* q,
-                                     const int32_t* cell_id_of_ptcl,
-                                     const int32_t* neigh_cell_id,
-                                     const int32_t* cell_pointer,
-                                     int32_t* neigh_list,
+                                     const int32_t* particle_position,
+                                     const int32_t* neigh_mesh_id,
+                                     const int32_t* mesh_index,
+                                     int32_t* transposed_list,
                                      int32_t* number_of_partners,
                                      const Dtype search_length2,
                                      const int32_t particle_number) {
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < particle_number) {
     const auto qi = q[tid];
-    const auto i_cell_id = cell_id_of_ptcl[tid];
+    const auto i_mesh_id = particle_position[tid];
     int32_t n_neigh = 0;
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id = cell_pointer[j_cell_id    ];
-      const auto end_id = cell_pointer[j_cell_id + 1];
+      const auto j_mesh_id = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id = mesh_index[j_mesh_id    ];
+      const auto end_id = mesh_index[j_mesh_id + 1];
       for (int32_t j = beg_id; j < end_id; j++) {
         const auto drx = qi.x - q[j].x;
         const auto dry = qi.y - q[j].y;
         const auto drz = qi.z - q[j].z;
         const auto dr2 = drx * drx + dry * dry + drz * drz;
         if (dr2 > search_length2 || j == tid) continue;
-        neigh_list[particle_number * n_neigh + tid] = j;
+        transposed_list[particle_number * n_neigh + tid] = j;
         n_neigh++;
       }
     }
@@ -34,29 +34,29 @@ __global__ void make_neighlist_naive(const Vec* q,
 
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_roc(const Vec* __restrict__ q,
-                                   const int32_t* __restrict__ cell_id_of_ptcl,
-                                   const int32_t* __restrict__ neigh_cell_id,
-                                   const int32_t* __restrict__ cell_pointer,
-                                   int32_t* __restrict__ neigh_list,
+                                   const int32_t* __restrict__ particle_position,
+                                   const int32_t* __restrict__ neigh_mesh_id,
+                                   const int32_t* __restrict__ mesh_index,
+                                   int32_t* __restrict__ transposed_list,
                                    int32_t* __restrict__ number_of_partners,
                                    const Dtype search_length2,
                                    const int32_t particle_number) {
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < particle_number) {
     const auto qi = q[tid];
-    const auto i_cell_id = cell_id_of_ptcl[tid];
+    const auto i_mesh_id = particle_position[tid];
     int32_t n_neigh = 0;
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id = cell_pointer[j_cell_id    ];
-      const auto end_id = cell_pointer[j_cell_id + 1];
+      const auto j_mesh_id = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id = mesh_index[j_mesh_id    ];
+      const auto end_id = mesh_index[j_mesh_id + 1];
       for (int32_t j = beg_id; j < end_id; j++) {
         const auto drx = qi.x - q[j].x;
         const auto dry = qi.y - q[j].y;
         const auto drz = qi.z - q[j].z;
         const auto dr2 = drx * drx + dry * dry + drz * drz;
         if (dr2 > search_length2 || j == tid) continue;
-        neigh_list[particle_number * n_neigh + tid] = j;
+        transposed_list[particle_number * n_neigh + tid] = j;
         n_neigh++;
       }
     }
@@ -67,27 +67,27 @@ __global__ void make_neighlist_roc(const Vec* __restrict__ q,
 __device__ __forceinline__
 void memcpy_to_gmem(const int32_t* list_buffer,
                     int32_t& n_neigh,
-                    int32_t* neigh_list,
+                    int32_t* transposed_list,
                     const int32_t num_out,
                     const int32_t tid,
                     const int32_t particle_number,
                     const int32_t loc_list_beg) {
   int32_t loc_list_idx = loc_list_beg;
-  int32_t neigh_list_idx = n_neigh * particle_number + tid;
+  int32_t transposed_list_idx = n_neigh * particle_number + tid;
   for (int k = 0; k < num_out; k++) {
-    neigh_list[neigh_list_idx] = list_buffer[loc_list_idx];
+    transposed_list[transposed_list_idx] = list_buffer[loc_list_idx];
     loc_list_idx += SMEM_BLOCK_NUM;
-    neigh_list_idx += particle_number;
+    transposed_list_idx += particle_number;
   }
   n_neigh += num_out;
 }
 
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_smem(const Vec* __restrict__ q,
-                                    const int32_t* __restrict__ cell_id_of_ptcl,
-                                    const int32_t* __restrict__ neigh_cell_id,
-                                    const int32_t* __restrict__ cell_pointer,
-                                    int32_t* __restrict__ neigh_list,
+                                    const int32_t* __restrict__ particle_position,
+                                    const int32_t* __restrict__ neigh_mesh_id,
+                                    const int32_t* __restrict__ mesh_index,
+                                    int32_t* __restrict__ transposed_list,
                                     int32_t* __restrict__ number_of_partners,
                                     const int32_t smem_loc_hei,
                                     const Dtype search_length2,
@@ -102,7 +102,7 @@ __global__ void make_neighlist_smem(const Vec* __restrict__ q,
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < particle_number) {
     const auto qi = q[tid];
-    const auto i_cell_id = cell_id_of_ptcl[tid];
+    const auto i_mesh_id = particle_position[tid];
     const auto tile_offset = smem_loc_hei * SMEM_BLOCK_NUM;
 
     const int32_t loc_list_beg = smem_tile_beg(tile_offset) + lane_id();
@@ -110,9 +110,9 @@ __global__ void make_neighlist_smem(const Vec* __restrict__ q,
 
     int32_t n_neigh = 0, n_loc_list = 0;
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id = cell_pointer[j_cell_id    ];
-      const auto end_id = cell_pointer[j_cell_id + 1];
+      const auto j_mesh_id = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id = mesh_index[j_mesh_id    ];
+      const auto end_id = mesh_index[j_mesh_id + 1];
       for (int32_t j = beg_id; j < end_id; j++) {
         const auto drx = qi.x - q[j].x;
         const auto dry = qi.y - q[j].y;
@@ -128,7 +128,7 @@ __global__ void make_neighlist_smem(const Vec* __restrict__ q,
         if (write_to_gmem) {
           memcpy_to_gmem(list_buffer,
                          n_neigh,
-                         neigh_list,
+                         transposed_list,
                          n_loc_list,
                          tid,
                          particle_number,
@@ -141,7 +141,7 @@ __global__ void make_neighlist_smem(const Vec* __restrict__ q,
 
     memcpy_to_gmem(list_buffer,
                    n_neigh,
-                   neigh_list,
+                   transposed_list,
                    n_loc_list,
                    tid,
                    particle_number,
@@ -162,7 +162,7 @@ int32_t loc_list_incr(int32_t loc_list_idx,
 __device__ __forceinline__
 void memcpy_to_gmem(const int32_t* list_buffer,
                     int32_t& n_neigh,
-                    int32_t* neigh_list,
+                    int32_t* transposed_list,
                     int32_t& loc_list_org,
                     const int32_t num_out,
                     const int32_t tid,
@@ -170,11 +170,11 @@ void memcpy_to_gmem(const int32_t* list_buffer,
                     const int32_t loc_list_beg,
                     const int32_t loc_list_end) {
   int32_t loc_list_idx = loc_list_org;
-  int32_t neigh_list_idx = n_neigh * particle_number + tid;
+  int32_t transposed_list_idx = n_neigh * particle_number + tid;
   for (int k = 0; k < num_out; k++) {
-    neigh_list[neigh_list_idx] = list_buffer[loc_list_idx];
+    transposed_list[transposed_list_idx] = list_buffer[loc_list_idx];
     loc_list_idx = loc_list_incr(loc_list_idx, loc_list_beg, loc_list_end);
-    neigh_list_idx += particle_number;
+    transposed_list_idx += particle_number;
   }
   loc_list_org = loc_list_idx;
   n_neigh += num_out;
@@ -182,10 +182,10 @@ void memcpy_to_gmem(const int32_t* list_buffer,
 
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
-                                          const int32_t* __restrict__ cell_id_of_ptcl,
-                                          const int32_t* __restrict__ neigh_cell_id,
-                                          const int32_t* __restrict__ cell_pointer,
-                                          int32_t* __restrict__ neigh_list,
+                                          const int32_t* __restrict__ particle_position,
+                                          const int32_t* __restrict__ neigh_mesh_id,
+                                          const int32_t* __restrict__ mesh_index,
+                                          int32_t* __restrict__ transposed_list,
                                           int32_t* __restrict__ number_of_partners,
                                           const int32_t smem_loc_hei,
                                           const Dtype search_length2,
@@ -200,7 +200,7 @@ __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < particle_number) {
     const auto qi = q[tid];
-    const auto i_cell_id = cell_id_of_ptcl[tid];
+    const auto i_mesh_id = particle_position[tid];
     const auto tile_offset = smem_loc_hei * SMEM_BLOCK_NUM;
 
     const int32_t loc_list_beg = smem_tile_beg(tile_offset) + lane_id();
@@ -210,9 +210,9 @@ __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
 
     int32_t n_neigh = 0, n_loc_list = 0;
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id = cell_pointer[j_cell_id    ];
-      const auto end_id = cell_pointer[j_cell_id + 1];
+      const auto j_mesh_id = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id = mesh_index[j_mesh_id    ];
+      const auto end_id = mesh_index[j_mesh_id + 1];
       for (int32_t j = beg_id; j < end_id; j++) {
         const auto drx = qi.x - q[j].x;
         const auto dry = qi.y - q[j].y;
@@ -232,7 +232,7 @@ __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
           if (num_out != 0) {
             memcpy_to_gmem(list_buffer,
                            n_neigh,
-                           neigh_list,
+                           transposed_list,
                            loc_list_org,
                            num_out,
                            tid,
@@ -243,7 +243,7 @@ __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
           } else if (n_loc_list != 0) {
             memcpy_to_gmem(list_buffer,
                            n_neigh,
-                           neigh_list,
+                           transposed_list,
                            loc_list_org,
                            1,
                            tid,
@@ -258,7 +258,7 @@ __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
 
     memcpy_to_gmem(list_buffer,
                    n_neigh,
-                   neigh_list,
+                   transposed_list,
                    loc_list_org,
                    n_loc_list,
                    tid,
@@ -270,24 +270,24 @@ __global__ void make_neighlist_smem_coars(const Vec* __restrict__ q,
 }
 
 template <typename Vec, typename Dtype>
-__global__ void make_neighlist_smem_cell(const Vec* __restrict__ q,
-                                         const int32_t* __restrict__ neigh_cell_id,
-                                         const int32_t* __restrict__ cell_pointer,
-                                         int32_t* __restrict__ neigh_list,
+__global__ void make_neighlist_smem_mesh(const Vec* __restrict__ q,
+                                         const int32_t* __restrict__ neigh_mesh_id,
+                                         const int32_t* __restrict__ mesh_index,
+                                         int32_t* __restrict__ transposed_list,
                                          int32_t* __restrict__ number_of_partners,
                                          const int32_t smem_loc_hei,
                                          const Dtype search_length2,
                                          const int32_t particle_number) {
   extern __shared__ Vec pos_buffer[];
-  const auto i_cell_id = blockIdx.x;
-  const auto tid = cell_pointer[i_cell_id] + threadIdx.x;
+  const auto i_mesh_id = blockIdx.x;
+  const auto tid = mesh_index[i_mesh_id] + threadIdx.x;
   const auto qi = q[tid];
-  const auto i_end_id = cell_pointer[i_cell_id + 1];
+  const auto i_end_id = mesh_index[i_mesh_id + 1];
 
   int32_t n_neigh = 0;
   for (int32_t cid = 0; cid < 27; cid++) {
-    const auto j_cell_id  = neigh_cell_id[27 * i_cell_id + cid];
-    const auto j_beg_id   = cell_pointer[j_cell_id];
+    const auto j_mesh_id  = neigh_mesh_id[27 * i_mesh_id + cid];
+    const auto j_beg_id   = mesh_index[j_mesh_id];
 
     // copy to smem
     __syncthreads();
@@ -298,7 +298,7 @@ __global__ void make_neighlist_smem_cell(const Vec* __restrict__ q,
     __syncthreads();
 
     if (tid < i_end_id) {
-      const auto num_loop_j = cell_pointer[j_cell_id + 1] - j_beg_id;
+      const auto num_loop_j = mesh_index[j_mesh_id + 1] - j_beg_id;
       for (int32_t j = 0; j < num_loop_j; j++) {
         const auto drx = qi.x - pos_buffer[j].x;
         const auto dry = qi.y - pos_buffer[j].y;
@@ -306,7 +306,7 @@ __global__ void make_neighlist_smem_cell(const Vec* __restrict__ q,
         const auto dr2 = drx * drx + dry * dry + drz * drz;
         j_ptcl_id = j + j_beg_id;
         if (dr2 > search_length2 || j_ptcl_id == tid) continue;
-        neigh_list[particle_number * n_neigh + tid] = j_ptcl_id;
+        transposed_list[particle_number * n_neigh + tid] = j_ptcl_id;
         n_neigh++;
       }
     }
@@ -317,10 +317,10 @@ __global__ void make_neighlist_smem_cell(const Vec* __restrict__ q,
 
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
-                                         const int32_t* __restrict__ cell_id_of_ptcl,
-                                         const int32_t* __restrict__ neigh_cell_id,
-                                         const int32_t* __restrict__ cell_pointer,
-                                         int32_t* __restrict__ neigh_list,
+                                         const int32_t* __restrict__ particle_position,
+                                         const int32_t* __restrict__ neigh_mesh_id,
+                                         const int32_t* __restrict__ mesh_index,
+                                         int32_t* __restrict__ transposed_list,
                                          int32_t* __restrict__ number_of_partners,
                                          const int32_t smem_loc_hei,
                                          const Dtype search_length2,
@@ -335,7 +335,7 @@ __global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < particle_number) {
     const auto qi = q[tid];
-    const auto i_cell_id = cell_id_of_ptcl[tid];
+    const auto i_mesh_id = particle_position[tid];
     const auto tile_offset = smem_loc_hei * SMEM_BLOCK_NUM;
 
     const int32_t loc_list_beg = smem_tile_beg(tile_offset) + lane_id();
@@ -344,9 +344,9 @@ __global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
     int32_t n_neigh = 0, n_loc_list = 0;
     bool use_smem = true;
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id = cell_pointer[j_cell_id    ];
-      const auto end_id = cell_pointer[j_cell_id + 1];
+      const auto j_mesh_id = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id = mesh_index[j_mesh_id    ];
+      const auto end_id = mesh_index[j_mesh_id + 1];
       for (int32_t j = beg_id; j < end_id; j++) {
         const auto drx = qi.x - q[j].x;
         const auto dry = qi.y - q[j].y;
@@ -361,7 +361,7 @@ __global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
           if (__any(n_loc_list == smem_loc_hei)) {
             memcpy_to_gmem(list_buffer,
                            n_neigh,
-                           neigh_list,
+                           transposed_list,
                            n_loc_list,
                            tid,
                            particle_number,
@@ -372,7 +372,7 @@ __global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
           use_smem = false;
         } else {
           if (dr2 < search_length2 && j != tid) {
-            neigh_list[particle_number * n_neigh + tid] = j;
+            transposed_list[particle_number * n_neigh + tid] = j;
             n_neigh++;
           }
         }
@@ -383,8 +383,8 @@ __global__ void make_neighlist_smem_once(const Vec* __restrict__ q,
 }
 
 // implement using cublas
-void transpose_neighlist(const int32_t* __restrict__ neigh_list_buf,
-                         int32_t* __restrict__ neigh_list,
+void transpose_neighlist(const int32_t* __restrict__ transposed_list_buf,
+                         int32_t* __restrict__ transposed_list,
                          const int32_t particle_number,
                          const int32_t max_partners) {
   static cublasHandle_t handle;
@@ -397,21 +397,21 @@ void transpose_neighlist(const int32_t* __restrict__ neigh_list_buf,
   cublasSafeCall(cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T,
                              particle_number, max_partners,
                              &alpha,
-                             reinterpret_cast<const float*>(neigh_list_buf),
+                             reinterpret_cast<const float*>(transposed_list_buf),
                              max_partners,
                              &beta,
-                             reinterpret_cast<const float*>(neigh_list_buf),
+                             reinterpret_cast<const float*>(transposed_list_buf),
                              max_partners,
-                             reinterpret_cast<float*>(neigh_list),
+                             reinterpret_cast<float*>(transposed_list),
                              particle_number));
 }
 
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
-                                           const int32_t* __restrict__ cell_id_of_ptcl,
-                                           const int32_t* __restrict__ neigh_cell_id,
-                                           const int32_t* __restrict__ cell_pointer,
-                                           int32_t* __restrict__ neigh_list_buf,
+                                           const int32_t* __restrict__ particle_position,
+                                           const int32_t* __restrict__ neigh_mesh_id,
+                                           const int32_t* __restrict__ mesh_index,
+                                           int32_t* __restrict__ transposed_list_buf,
                                            int32_t* __restrict__ number_of_partners,
                                            const Dtype search_length2,
                                            const int32_t max_partners,
@@ -419,14 +419,14 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
   const auto i_ptcl_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
   if (i_ptcl_id < particle_number) {
     const auto qi        = q[i_ptcl_id];
-    const auto i_cell_id = cell_id_of_ptcl[i_ptcl_id];
+    const auto i_mesh_id = particle_position[i_ptcl_id];
     const auto lid       = lane_id();
     int32_t n_neigh      = 0;
 
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id    = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id       = cell_pointer[j_cell_id];
-      const auto num_loop     = cell_pointer[j_cell_id + 1] - beg_id;
+      const auto j_mesh_id    = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id       = mesh_index[j_mesh_id];
+      const auto num_loop     = mesh_index[j_mesh_id + 1] - beg_id;
       const auto num_loop_ini = (num_loop / warpSize) * warpSize;
 
       int32_t j = 0;
@@ -441,7 +441,7 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
         if (in_range) {
           const uint32_t mask   = (0xffffffff >> (31 - lid));
           const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-          neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
+          transposed_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
         }
         n_neigh += __popc(flag);
       }
@@ -458,7 +458,7 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
         if (in_range) {
           const uint32_t mask   = (0xffffffff >> (31 - lid));
           const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-          neigh_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
+          transposed_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
         }
         n_neigh += __popc(flag);
       }
@@ -469,23 +469,23 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
   }
 }
 
-template <int MAX_PTCL_NUM_IN_NCELL>
-__global__ void make_ptcl_id_of_neigh_cell(const int32_t* __restrict__ cell_id_of_ptcl,
-                                           const int32_t* __restrict__ neigh_cell_id,
-                                           const int32_t* __restrict__ cell_pointer,
-                                           int32_t* __restrict__ num_of_ptcl_in_neigh_cell,
-                                           int32_t* __restrict__ ptcl_id_of_neigh_cell,
-                                           const int32_t tot_cell_num) {
-  const auto i_cell_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
-  if (i_cell_id < tot_cell_num) {
+template <int MAX_PTCL_NUM_IN_NMESH>
+__global__ void make_ptcl_id_of_neigh_mesh(const int32_t* __restrict__ particle_position,
+                                           const int32_t* __restrict__ neigh_mesh_id,
+                                           const int32_t* __restrict__ mesh_index,
+                                           int32_t* __restrict__ num_of_ptcl_in_neigh_mesh,
+                                           int32_t* __restrict__ ptcl_id_of_neigh_mesh,
+                                           const int32_t tot_mesh_num) {
+  const auto i_mesh_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
+  if (i_mesh_id < tot_mesh_num) {
     const auto lid = lane_id();
-    int32_t* loc_id = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
+    int32_t* loc_id = &ptcl_id_of_neigh_mesh[i_mesh_id * MAX_PTCL_NUM_IN_NMESH];
 
     int32_t n_neigh = 0;
     for (int32_t cid = 0; cid < 27; cid++) {
-      const auto j_cell_id    = neigh_cell_id[27 * i_cell_id + cid];
-      const auto beg_id       = cell_pointer[j_cell_id];
-      const auto num_loop     = cell_pointer[j_cell_id + 1] - beg_id;
+      const auto j_mesh_id    = neigh_mesh_id[27 * i_mesh_id + cid];
+      const auto beg_id       = mesh_index[j_mesh_id];
+      const auto num_loop     = mesh_index[j_mesh_id + 1] - beg_id;
       const auto num_loop_ini = (num_loop / warpSize) * warpSize;
 
       int32_t j = 0;
@@ -501,16 +501,16 @@ __global__ void make_ptcl_id_of_neigh_cell(const int32_t* __restrict__ cell_id_o
       n_neigh += remaining_loop;
     }
 
-    if (lid == 0) num_of_ptcl_in_neigh_cell[i_cell_id] = n_neigh;
+    if (lid == 0) num_of_ptcl_in_neigh_mesh[i_mesh_id] = n_neigh;
   }
 }
 
-template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NCELL>
+template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NMESH>
 __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
-                                                      const int32_t* __restrict__ cell_id_of_ptcl,
-                                                      const int32_t* __restrict__ num_of_ptcl_in_neigh_cell,
-                                                      const int32_t* __restrict__ ptcl_id_of_neigh_cell,
-                                                      int32_t* __restrict__ neigh_list_buf,
+                                                      const int32_t* __restrict__ particle_position,
+                                                      const int32_t* __restrict__ num_of_ptcl_in_neigh_mesh,
+                                                      const int32_t* __restrict__ ptcl_id_of_neigh_mesh,
+                                                      int32_t* __restrict__ transposed_list_buf,
                                                       int32_t* __restrict__ number_of_partners,
                                                       const Dtype search_length2,
                                                       const int32_t max_partners,
@@ -518,13 +518,13 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
   const auto i_ptcl_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
   if (i_ptcl_id < particle_number) {
     const auto qi        = q[i_ptcl_id];
-    const auto i_cell_id = cell_id_of_ptcl[i_ptcl_id];
+    const auto i_mesh_id = particle_position[i_ptcl_id];
     const auto lid       = lane_id();
     int32_t n_neigh      = 0;
 
-    const int32_t* loc_id       = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
-    int32_t* neigh_list_buf_loc = &neigh_list_buf[i_ptcl_id * max_partners];
-    const auto num_loop         = num_of_ptcl_in_neigh_cell[i_cell_id];
+    const int32_t* loc_id       = &ptcl_id_of_neigh_mesh[i_mesh_id * MAX_PTCL_NUM_IN_NMESH];
+    int32_t* transposed_list_buf_loc = &transposed_list_buf[i_ptcl_id * max_partners];
+    const auto num_loop         = num_of_ptcl_in_neigh_mesh[i_mesh_id];
     const auto num_loop_ini     = (num_loop / warpSize) * warpSize;
     const uint32_t mask         = (0xffffffff >> (31 - lid));
 
@@ -539,7 +539,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
       const uint32_t flag = __ballot(in_range);
       if (in_range) {
         const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-        neigh_list_buf_loc[str_dst] = j_ptcl_id;
+        transposed_list_buf_loc[str_dst] = j_ptcl_id;
       }
       n_neigh += __popc(flag);
     }
@@ -555,7 +555,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
       const uint32_t flag = __ballot(in_range);
       if (in_range) {
         const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-        neigh_list_buf_loc[str_dst] = j_ptcl_id;
+        transposed_list_buf_loc[str_dst] = j_ptcl_id;
       }
       n_neigh += __popc(flag);
     }
@@ -564,21 +564,21 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
   }
 }
 
-template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NCELL>
+template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NMESH>
 __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict__ q,
-                                                          const int32_t* __restrict__ num_of_ptcl_in_neigh_cell,
-                                                          const int32_t* __restrict__ ptcl_id_of_neigh_cell,
-                                                          const int32_t* __restrict__ cell_pointer,
-                                                          int32_t* __restrict__ neigh_list_buf,
+                                                          const int32_t* __restrict__ num_of_ptcl_in_neigh_mesh,
+                                                          const int32_t* __restrict__ ptcl_id_of_neigh_mesh,
+                                                          const int32_t* __restrict__ mesh_index,
+                                                          int32_t* __restrict__ transposed_list_buf,
                                                           int32_t* __restrict__ number_of_partners,
                                                           const Dtype search_length2,
-                                                          const int32_t tot_cell_num,
+                                                          const int32_t tot_mesh_num,
                                                           const int32_t max_partners,
                                                           const int32_t particle_number) {
-  const auto i_cell_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
-  if (i_cell_id < tot_cell_num) {
-    const auto beg_id         = cell_pointer[i_cell_id];
-    const auto num_i_loop     = cell_pointer[i_cell_id + 1] - beg_id;
+  const auto i_mesh_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
+  if (i_mesh_id < tot_mesh_num) {
+    const auto beg_id         = mesh_index[i_mesh_id];
+    const auto num_i_loop     = mesh_index[i_mesh_id + 1] - beg_id;
     const auto num_i_loop_ini = (num_i_loop >> 2) << 2;
 
     int32_t i = 0;
@@ -596,13 +596,13 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
       const auto lid       = lane_id();
       int32_t n_neigh0 = 0, n_neigh1 = 0, n_neigh2 = 0, n_neigh3 = 0;
 
-      int32_t* neigh_list_buf_loc0 = &neigh_list_buf[i_ptcl_id0 * max_partners];
-      int32_t* neigh_list_buf_loc1 = &neigh_list_buf[i_ptcl_id1 * max_partners];
-      int32_t* neigh_list_buf_loc2 = &neigh_list_buf[i_ptcl_id2 * max_partners];
-      int32_t* neigh_list_buf_loc3 = &neigh_list_buf[i_ptcl_id3 * max_partners];
+      int32_t* transposed_list_buf_loc0 = &transposed_list_buf[i_ptcl_id0 * max_partners];
+      int32_t* transposed_list_buf_loc1 = &transposed_list_buf[i_ptcl_id1 * max_partners];
+      int32_t* transposed_list_buf_loc2 = &transposed_list_buf[i_ptcl_id2 * max_partners];
+      int32_t* transposed_list_buf_loc3 = &transposed_list_buf[i_ptcl_id3 * max_partners];
 
-      const int32_t* loc_id     = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
-      const auto num_j_loop     = num_of_ptcl_in_neigh_cell[i_cell_id];
+      const int32_t* loc_id     = &ptcl_id_of_neigh_mesh[i_mesh_id * MAX_PTCL_NUM_IN_NMESH];
+      const auto num_j_loop     = num_of_ptcl_in_neigh_mesh[i_mesh_id];
       const auto num_j_loop_ini = (num_j_loop / warpSize) * warpSize;
       const uint32_t mask       = (0xffffffff >> (31 - lid));
 
@@ -635,7 +635,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         uint32_t flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh0 - 1;
-          neigh_list_buf_loc0[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc0[str_dst] = j_ptcl_id;
         }
         n_neigh0 += __popc(flag);
 
@@ -643,7 +643,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh1 - 1;
-          neigh_list_buf_loc1[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc1[str_dst] = j_ptcl_id;
         }
         n_neigh1 += __popc(flag);
 
@@ -651,7 +651,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh2 - 1;
-          neigh_list_buf_loc2[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc2[str_dst] = j_ptcl_id;
         }
         n_neigh2 += __popc(flag);
 
@@ -659,7 +659,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh3 - 1;
-          neigh_list_buf_loc3[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc3[str_dst] = j_ptcl_id;
         }
         n_neigh3 += __popc(flag);
       }
@@ -693,7 +693,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         uint32_t flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh0 - 1;
-          neigh_list_buf_loc0[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc0[str_dst] = j_ptcl_id;
         }
         n_neigh0 += __popc(flag);
 
@@ -701,7 +701,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh1 - 1;
-          neigh_list_buf_loc1[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc1[str_dst] = j_ptcl_id;
         }
         n_neigh1 += __popc(flag);
 
@@ -709,7 +709,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh2 - 1;
-          neigh_list_buf_loc2[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc2[str_dst] = j_ptcl_id;
         }
         n_neigh2 += __popc(flag);
 
@@ -717,7 +717,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh3 - 1;
-          neigh_list_buf_loc3[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc3[str_dst] = j_ptcl_id;
         }
         n_neigh3 += __popc(flag);
       }
@@ -736,9 +736,9 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
       const auto lid       = lane_id();
       int32_t n_neigh      = 0;
 
-      const int32_t* loc_id       = &ptcl_id_of_neigh_cell[i_cell_id * MAX_PTCL_NUM_IN_NCELL];
-      int32_t* neigh_list_buf_loc = &neigh_list_buf[i_ptcl_id * max_partners];
-      const auto num_loop         = num_of_ptcl_in_neigh_cell[i_cell_id];
+      const int32_t* loc_id       = &ptcl_id_of_neigh_mesh[i_mesh_id * MAX_PTCL_NUM_IN_NMESH];
+      int32_t* transposed_list_buf_loc = &transposed_list_buf[i_ptcl_id * max_partners];
+      const auto num_loop         = num_of_ptcl_in_neigh_mesh[i_mesh_id];
       const auto num_loop_ini     = (num_loop / warpSize) * warpSize;
       const uint32_t mask         = (0xffffffff >> (31 - lid));
 
@@ -753,7 +753,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         const uint32_t flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-          neigh_list_buf_loc[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc[str_dst] = j_ptcl_id;
         }
         n_neigh += __popc(flag);
       }
@@ -769,7 +769,7 @@ __global__ void make_neighlist_warp_unroll_loop_fused_rev(const Vec* __restrict_
         const uint32_t flag = __ballot(in_range);
         if (in_range) {
           const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
-          neigh_list_buf_loc[str_dst] = j_ptcl_id;
+          transposed_list_buf_loc[str_dst] = j_ptcl_id;
         }
         n_neigh += __popc(flag);
       }
