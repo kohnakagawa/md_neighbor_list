@@ -61,6 +61,7 @@ class NeighListGPU {
   thrust::device_ptr<Vec> buffer_;
   thrust::device_ptr<int> uni_vect_, out_key_;
 
+  thrust::device_ptr<int32_t> particle_position_buf_;
   thrust::device_ptr<int32_t> transposed_list_buf_;
   thrust::device_ptr<int32_t> num_of_ptcl_in_neigh_mesh_;
   thrust::device_ptr<int32_t> ptcl_id_of_neigh_mesh_;
@@ -103,6 +104,7 @@ class NeighListGPU {
     uni_vect_       = thrust::device_new<int>(particle_number);
     out_key_        = thrust::device_new<int>(particle_number);
 
+    particle_position_buf_ = thrust::device_new<int32_t>(particle_number);
     transposed_list_buf_ = thrust::device_new<int32_t>(particle_number * MAX_PARTNERS);
     num_of_ptcl_in_neigh_mesh_ = thrust::device_new<int32_t>(number_of_mesh_);
     ptcl_id_of_neigh_mesh_ = thrust::device_new<int32_t>(number_of_mesh_ * 27 * NMAX_IN_MESH);
@@ -113,6 +115,7 @@ class NeighListGPU {
     thrust::device_delete(uni_vect_);
     thrust::device_delete(out_key_);
 
+    thrust::device_delete(particle_position_buf_);
     thrust::device_delete(transposed_list_buf_);
     thrust::device_delete(num_of_ptcl_in_neigh_mesh_);
     thrust::device_delete(ptcl_id_of_neigh_mesh_);
@@ -167,48 +170,38 @@ class NeighListGPU {
     thrust::inclusive_scan(number_in_mesh_.thrust_ptr,
                            number_in_mesh_.thrust_ptr + number_of_mesh_,
                            mesh_index_.thrust_ptr + 1);
+
+    thrust::copy_n(particle_position_buf_,
+                   particle_number,
+                   particle_position_.thrust_ptr);
   }
 
-  void SortPtclData(cuda_ptr<Vec>& q,
-                    cuda_ptr<Vec>& p,
-                    const int32_t particle_number) {
+  void MakeMesh(cuda_ptr<Vec>& q,
+                const int particle_number,
+                const int tblock_size = 128) {
+    const int32_t mesh_size = particle_number / tblock_size + 1;
+    make_mesh<Vec><<<mesh_size, tblock_size>>>(q, particle_position_, particle_number);
+    checkCudaErrors(cudaDeviceSynchronize());
+  }
+
+  void MakePtclIdInMesh(const int32_t particle_number) {
     thrust::sequence(ptcl_id_in_mesh_.thrust_ptr,
                      ptcl_id_in_mesh_.thrust_ptr + particle_number);
+    thrust::copy_n(particle_position_.thrust_ptr,
+                   particle_number,
+                   particle_position_buf_);
     thrust::sort_by_key(particle_position_.thrust_ptr,
                         particle_position_.thrust_ptr + particle_number,
                         ptcl_id_in_mesh_.thrust_ptr);
-    CopyGather(q.thrust_ptr,
-               buffer_,
-               ptcl_id_in_mesh_.thrust_ptr,
-               particle_number);
-    CopyGather(p.thrust_ptr,
-               buffer_,
-               ptcl_id_in_mesh_.thrust_ptr,
-               particle_number);
-    // thrust::sequence(ptcl_id_in_mesh_.thrust_ptr,
-    //                  ptcl_id_in_mesh_.thrust_ptr + particle_number);
   }
 
-  void CheckMeshIdOfPtcl(const int32_t particle_number,
-                         cuda_ptr<Vec>& q) {
-    particle_position_.dev2host();
-    for (int i = 0; i < particle_number; i++) {
-      const auto ref = GenHash(q[i]);
-      if (particle_position_[i] != ref) {
-        std::cerr << "particle_position_ is not correct.\n";
-        std::exit(1);
-      }
-    }
-    std::cerr << "particle_position_ is correct.\n";
-  }
-
-  void CheckSorted(cuda_ptr<Vec>& q,
-                   const int32_t particle_number) {
+  void CheckParticlePosition(cuda_ptr<Vec>& q,
+                             const int32_t particle_number) {
     q.dev2host();
     particle_position_.dev2host();
-    for (int32_t i = 0; i < particle_number; i++) {
-      const auto hash = GenHash(q[i]);
-      if (hash != particle_position_[i]) {
+
+    for (int i = 0; i < particle_number; i++) {
+      if (GenHash(q[i]) != particle_position_[i]) {
         std::cerr << "particle data is not correctly sorted.\n";
         std::exit(1);
       }
@@ -218,12 +211,15 @@ class NeighListGPU {
 
   void CheckMeshPointer(cuda_ptr<Vec>& q) {
     q.dev2host();
+    particle_position_.dev2host();
+    ptcl_id_in_mesh_.dev2host();
     mesh_index_.dev2host();
+
     for (int32_t mesh = 0; mesh < number_of_mesh_; mesh++) {
       const auto beg = mesh_index_[mesh    ];
       const auto end = mesh_index_[mesh + 1];
       for (int32_t i = beg; i < end; i++) {
-        const auto hash = GenHash(q[i]);
+        const auto hash = particle_position_[ptcl_id_in_mesh_[i]];
         if (hash != mesh) {
           std::cerr << "mesh_pointer is not correctly sorted.\n";
           std::exit(1);
@@ -293,14 +289,14 @@ public:
                      const bool sync = true,
                      int32_t tblock_size = 128,
                      const int32_t smem_hei = 7) {
-    const int32_t mesh_size = particle_number / tblock_size + 1;
-    make_mesh<Vec><<<mesh_size, tblock_size>>>(q, particle_position_, particle_number);
-    SortPtclData(q, p, particle_number);
+    const int mesh_size = particle_number / 128 + 1;
+
+    MakeMesh(q, particle_number, tblock_size);
+    MakePtclIdInMesh(particle_number);
     CountNumberInEachMesh(particle_number);
 
 #ifdef DEBUG
-    CheckMeshIdOfPtcl(particle_number, q);
-    CheckSorted(q, particle_number);
+    CheckParticlePosition(q, particle_number);
     CheckMeshPointer(q);
 #endif
 
@@ -315,11 +311,12 @@ public:
                                                           particle_position_,
                                                           neigh_mesh_id_,
                                                           mesh_index_,
+                                                          ptcl_id_in_mesh_,
                                                           transposed_list_,
                                                           number_of_partners_,
                                                           search_length2_,
                                                           particle_number);
-#elif defined USE_ROC
+#elif USE_ROC
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_roc<Vec, Dtype>,
                                              cudaFuncCachePreferL1));
@@ -329,11 +326,12 @@ public:
                                                         particle_position_,
                                                         neigh_mesh_id_,
                                                         mesh_index_,
+                                                        ptcl_id_in_mesh_,
                                                         transposed_list_,
                                                         number_of_partners_,
                                                         search_length2_,
                                                         particle_number);
-#elif defined USE_SMEM
+#elif USE_SMEM
     const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
     const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
     if (is_first) {
@@ -345,29 +343,13 @@ public:
                                                                     particle_position_,
                                                                     neigh_mesh_id_,
                                                                     mesh_index_,
+                                                                    ptcl_id_in_mesh_,
                                                                     transposed_list_,
                                                                     number_of_partners_,
                                                                     smem_hei,
                                                                     search_length2_,
                                                                     particle_number);
-#elif defined USE_SMEM_COARS
-    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
-    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
-    if (is_first) {
-      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem_coars<Vec, Dtype>,
-                                             cudaFuncCachePreferShared));
-      is_first = false;
-    }
-    make_neighlist_smem_coars<Vec><<<mesh_size, tblock_size, smem_size>>>(q,
-                                                                          particle_position_,
-                                                                          neigh_mesh_id_,
-                                                                          mesh_index_,
-                                                                          transposed_list_,
-                                                                          number_of_partners_,
-                                                                          smem_hei,
-                                                                          search_length2_,
-                                                                          particle_number);
-#elif defined USE_SMEM_MESH
+#elif USE_SMEM_MESH
     tblock_size = ((nmax_in_mesh_ - 1) / WARP_SIZE + 1) * WARP_SIZE;
     const int32_t smem_size = nmax_in_mesh_ * sizeof(Vec);
     if (is_first) {
@@ -378,29 +360,13 @@ public:
     make_neighlist_smem_mesh<Vec><<<number_of_mesh_, tblock_size, smem_size>>>(q,
                                                                                neigh_mesh_id_,
                                                                                mesh_index_,
+                                                                               ptcl_id_in_mesh_,
                                                                                transposed_list_,
                                                                                number_of_partners_,
                                                                                smem_hei,
                                                                                search_length2_,
                                                                                particle_number);
-#elif defined USE_SMEM_ONCE
-    const int32_t num_smem_block = (tblock_size - 1) / SMEM_BLOCK_NUM + 1;
-    const int32_t smem_size = smem_hei * num_smem_block * SMEM_BLOCK_NUM * sizeof(int32_t);
-    if (is_first) {
-      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_smem_once<Vec, Dtype>,
-                                             cudaFuncCachePreferShared));
-      is_first = false;
-    }
-    make_neighlist_smem_once<Vec><<<mesh_size, tblock_size, smem_size>>>(q,
-                                                                         particle_position_,
-                                                                         neigh_mesh_id_,
-                                                                         mesh_index_,
-                                                                         transposed_list_,
-                                                                         number_of_partners_,
-                                                                         smem_hei,
-                                                                         search_length2_,
-                                                                         particle_number);
-#elif defined USE_MATRIX_TRANSPOSE
+#elif USE_MATRIX_TRANSPOSE
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll<Vec, Dtype>,
                                              cudaFuncCachePreferL1));
@@ -412,6 +378,7 @@ public:
                                                                 particle_position_,
                                                                 neigh_mesh_id_,
                                                                 mesh_index_,
+                                                                ptcl_id_in_mesh_,
                                                                 thrust::raw_pointer_cast(transposed_list_buf_),
                                                                 number_of_partners_,
                                                                 search_length2_,
@@ -421,7 +388,7 @@ public:
                         transposed_list_,
                         particle_number,
                         MAX_PARTNERS);
-#elif defined USE_MATRIX_TRANSPOSE_LOOP_FUSED
+#elif USE_MATRIX_TRANSPOSE_LOOP_FUSED
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll_loop_fused<Vec, Dtype, 27 * NMAX_IN_MESH>,
                                              cudaFuncCachePreferL1));
@@ -431,6 +398,7 @@ public:
     make_ptcl_id_of_neigh_mesh<27 * NMAX_IN_MESH><<<grid_size, tblock_size>>>(particle_position_,
                                                                               neigh_mesh_id_,
                                                                               mesh_index_,
+                                                                              ptcl_id_in_mesh_,
                                                                               thrust::raw_pointer_cast(num_of_ptcl_in_neigh_mesh_),
                                                                               thrust::raw_pointer_cast(ptcl_id_of_neigh_mesh_),
                                                                               number_of_mesh_);
@@ -446,36 +414,6 @@ public:
                                                                                          search_length2_,
                                                                                          MAX_PARTNERS,
                                                                                          particle_number);
-    transpose_neighlist(thrust::raw_pointer_cast(transposed_list_buf_),
-                        transposed_list_,
-                        particle_number,
-                        MAX_PARTNERS);
-#elif defined USE_MATRIX_TRANSPOSE_LOOP_FUSED_REV
-    if (is_first) {
-      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll_loop_fused<Vec, Dtype, 27 * NMAX_IN_MESH>,
-                                             cudaFuncCachePreferL1));
-      is_first = false;
-    }
-    auto grid_size = (number_of_mesh_ - 1) / (tblock_size / 32) + 1;
-    make_ptcl_id_of_neigh_mesh<27 * NMAX_IN_MESH><<<grid_size, tblock_size>>>(particle_position_,
-                                                                              neigh_mesh_id_,
-                                                                              mesh_index_,
-                                                                              thrust::raw_pointer_cast(num_of_ptcl_in_neigh_mesh_),
-                                                                              thrust::raw_pointer_cast(ptcl_id_of_neigh_mesh_),
-                                                                              number_of_mesh_);
-    grid_size = (number_of_mesh_ - 1) / (tblock_size / 32) + 1;
-    make_neighlist_warp_unroll_loop_fused_rev<Vec,
-                                              Dtype,
-                                              27 * NMAX_IN_MESH><<<grid_size, tblock_size>>>(q,
-                                                                                             thrust::raw_pointer_cast(num_of_ptcl_in_neigh_mesh_),
-                                                                                             thrust::raw_pointer_cast(ptcl_id_of_neigh_mesh_),
-                                                                                             mesh_index_,
-                                                                                             thrust::raw_pointer_cast(transposed_list_buf_),
-                                                                                             number_of_partners_,
-                                                                                             search_length2_,
-                                                                                             number_of_mesh_,
-                                                                                             MAX_PARTNERS,
-                                                                                             particle_number);
     transpose_neighlist(thrust::raw_pointer_cast(transposed_list_buf_),
                         transposed_list_,
                         particle_number,

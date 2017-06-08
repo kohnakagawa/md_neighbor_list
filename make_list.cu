@@ -171,10 +171,21 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  const auto max_num_of_partners = *std::max_element(number_of_partners_ref.begin(),
+                                                     number_of_partners_ref.end());
+  std::vector<int> ref_buf(max_num_of_partners, 0);
+  std::vector<int> gpu_buf(max_num_of_partners, 0);
   for (int i = 0; i < particle_number; i++) {
     for (int j = 0; j < number_of_partners[i]; j++) {
-      const auto gpu_neigh_list = neigh_list[particle_number * j + i];
-      const auto ref = neigh_list_ref[particle_number * j + i];
+      ref_buf[j] = neigh_list_ref[particle_number * j + i];
+      gpu_buf[j] = neigh_list[particle_number * j + i];
+    }
+    std::sort(ref_buf.begin(), ref_buf.begin() + number_of_partners[i]);
+    std::sort(gpu_buf.begin(), gpu_buf.begin() + number_of_partners[i]);
+
+    for (int j = 0; j < number_of_partners[i]; j++) {
+      const auto gpu_neigh_list = gpu_buf[j];
+      const auto ref            = ref_buf[j];
       if (gpu_neigh_list != ref) {
         std::cerr << "TEST fail\n";
         PRINT_WITH_TAG(std::cerr, i);
