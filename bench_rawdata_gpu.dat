@@ -1,0 +1,34 @@
+@ density = 1.0
+@ Tesla K40t
+make_list_gpu_ref.out                    2559[ms]
+make_list_gpu_roc.out                    2306[ms]
+make_list_gpu_smem.out                   1858[ms]
+make_list_gpu_smem_mesh.out              1512[ms]
+make_list_gpu_warp_unroll.out            1573[ms]
+make_list_gpu_warp_unroll_fused_loop.out 1464[ms]
+
+@ Tesla P100
+make_list_gpu_ref.out                    1025[ms]
+make_list_gpu_roc.out                    1019[ms]
+make_list_gpu_smem.out                    847[ms]
+make_list_gpu_smem_mesh.out               728[ms]
+make_list_gpu_warp_unroll.out             579[ms]
+make_list_gpu_warp_unroll_fused_loop.out  519[ms]
+
+@ density = 0.5
+@ Tesla K40t
+make_list_gpu_ref.out                     803[ms]
+make_list_gpu_roc.out                     694[ms]
+make_list_gpu_smem.out                    551[ms]
+make_list_gpu_smem_mesh.out               594[ms]
+make_list_gpu_warp_unroll_fused_loop.out  525[ms]
+make_list_gpu_warp_unroll.out             642[ms]
+
+@ Tesla P100
+make_list_gpu_ref.out                     294[ms]
+make_list_gpu_roc.out                     286[ms]
+make_list_gpu_smem.out                    260[ms]
+make_list_gpu_smem_mesh.out               223[ms]
+make_list_gpu_warp_unroll.out             341[ms]
+make_list_gpu_warp_unroll_fused_loop.out  308[ms]
+
