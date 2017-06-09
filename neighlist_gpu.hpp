@@ -162,6 +162,8 @@ class NeighListGPU {
       std::cerr << "number_of_mesh_ = " << number_of_mesh_ << std::endl;
       std::exit(1);
     }
+#else
+    static_cast<void>(new_end);
 #endif
     nmax_in_mesh_ = thrust::reduce(number_in_mesh_.thrust_ptr,
                                    number_in_mesh_.thrust_ptr + number_of_mesh_,
@@ -284,13 +286,10 @@ public:
   }
 
   void MakeNeighList(cuda_ptr<Vec>& q,
-                     cuda_ptr<Vec>& p,
                      const int32_t particle_number,
                      const bool sync = true,
                      int32_t tblock_size = 128,
                      const int32_t smem_hei = 7) {
-    const int mesh_size = particle_number / 128 + 1;
-
     MakeMesh(q, particle_number, tblock_size);
     MakePtclIdInMesh(particle_number);
     CountNumberInEachMesh(particle_number);
@@ -302,12 +301,14 @@ public:
 
     static bool is_first = true;
 #ifdef REFERENCE
+    static_cast<void>(smem_hei);
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_naive<Vec, Dtype>,
                                              cudaFuncCachePreferL1));
       is_first = false;
     }
-    make_neighlist_naive<Vec><<<mesh_size, tblock_size>>>(q,
+    const int grid_size = (particle_number - 1) / tblock_size + 1;
+    make_neighlist_naive<Vec><<<grid_size, tblock_size>>>(q,
                                                           particle_position_,
                                                           neigh_mesh_id_,
                                                           mesh_index_,
@@ -317,12 +318,14 @@ public:
                                                           search_length2_,
                                                           particle_number);
 #elif USE_ROC
+    static_cast<void>(smem_hei);
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_roc<Vec, Dtype>,
                                              cudaFuncCachePreferL1));
       is_first = false;
     }
-    make_neighlist_roc<Vec><<<mesh_size, tblock_size>>>(q,
+    const int grid_size = (particle_number - 1) / tblock_size + 1;
+    make_neighlist_roc<Vec><<<grid_size, tblock_size>>>(q,
                                                         particle_position_,
                                                         neigh_mesh_id_,
                                                         mesh_index_,
@@ -339,7 +342,8 @@ public:
                                              cudaFuncCachePreferShared));
       is_first = false;
     }
-    make_neighlist_smem<Vec><<<mesh_size, tblock_size, smem_size>>>(q,
+    const int grid_size = (particle_number - 1) / tblock_size + 1;
+    make_neighlist_smem<Vec><<<grid_size, tblock_size, smem_size>>>(q,
                                                                     particle_position_,
                                                                     neigh_mesh_id_,
                                                                     mesh_index_,
@@ -367,6 +371,7 @@ public:
                                                                                search_length2_,
                                                                                particle_number);
 #elif USE_MATRIX_TRANSPOSE
+    static_cast<void>(smem_hei);
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll<Vec, Dtype>,
                                              cudaFuncCachePreferL1));
@@ -389,6 +394,7 @@ public:
                         particle_number,
                         MAX_PARTNERS);
 #elif USE_MATRIX_TRANSPOSE_LOOP_FUSED
+    static_cast<void>(smem_hei);
     if (is_first) {
       checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll_loop_fused<Vec, Dtype, 27 * NMAX_IN_MESH>,
                                              cudaFuncCachePreferL1));

@@ -43,12 +43,12 @@ static inline void __cublasSafeCall(cublasStatus_t err,
                                     const int line)
 {
   if (CUBLAS_STATUS_SUCCESS != err) {
-    fprintf(stderr, "CUBLAS error in file '%s', line %d\n \nerror %d \nterminating!\n",__FILE__, __LINE__,err);
+    fprintf(stderr, "CUBLAS error in file '%s', line %d\n \nerror %d \nterminating!\n", file, line, err);
     cudaDeviceReset();
     assert(0);
   }
 }
 
 #ifndef cublasSafeCall
-#define cublasSafeCall(err)     __cublasSafeCall(err, __FILE__, __LINE__)
+#define cublasSafeCall(err) __cublasSafeCall(err, __FILE__, __LINE__)
 #endif

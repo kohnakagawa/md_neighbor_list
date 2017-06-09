@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
   nlistmaker.Initialize(particle_number);
   const auto beg = std::chrono::system_clock::now();
   for (int i = 0; i < LOOP; i++) {
-    nlistmaker.MakeNeighList(q, p, particle_number, false, tblock_size, smem_hei);
+    nlistmaker.MakeNeighList(q, particle_number, false, tblock_size, smem_hei);
   }
   checkCudaErrors(cudaDeviceSynchronize());
   const auto end = std::chrono::system_clock::now();

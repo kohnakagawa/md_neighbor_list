@@ -10,23 +10,23 @@ GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out\
 	make_list_gpu_smem_mesh.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out
 TARGET = $(CPU)
 
-WARNINGS = -Wall -Wextra -Wunused-variable -Wsign-compare
+WARNINGS = -Wall -Wextra -Werror
 OPT_FLAGS = -O3
 # OPT_FLAGS = -O0 -g -DDEBUG
 
-cuda_profile = yes
+cuda_profile = no
 
-# CUDA_HOME=/home/app/cuda/cuda-7.0
-CUDA_HOME=/usr/local/cuda
+CUDA_HOME=$(CUDA_PATH)
+# CUDA_HOME=/usr/local/cuda
 
 NVCC=$(CUDA_HOME)/bin/nvcc
 NVCCFLAGS= $(OPT_FLAGS) -std=c++11 -arch=sm_35 -Xcompiler "$(WARNINGS) $(OPT_FLAGS)" -ccbin=g++
-INCLUDE = -I$(CUDA_HOME)/include -I$(CUDA_HOME)/samples/common/inc
+INCLUDE = -isystem $(CUDA_HOME)/include -isystem $(CUDA_HOME)/samples/common/inc
 ifeq ($(cuda_profile), yes)
 NVCCFLAGS += -lineinfo -Xptxas -v
 endif
 
-LIBRARY = -lcublas
+LIBRARY = -L$(CUDA_HOME)/lib64 -lcublas
 
 ICC = icpc
 
