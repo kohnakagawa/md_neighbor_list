@@ -190,10 +190,8 @@ class NeighListAVX512 {
   }
 
   void SortPtclData(Vec* __restrict q,
-                    Vec* __restrict p,
                     const int32_t particle_number) {
     Gather(q, data_buf_, particle_number, sort_buf_);
-    Gather(p, data_buf_, particle_number, sort_buf_);
     std::iota(ptcl_id_in_mesh_, ptcl_id_in_mesh_ + particle_number, 0);
   }
 
@@ -259,7 +257,7 @@ class NeighListAVX512 {
   }
 
   void MakePairListSIMD1x8(const Vec* q,
-                                    const int32_t particle_number) {
+                           const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
     const v8df vsl2 = _mm512_set1_pd(search_length2_);
@@ -324,7 +322,7 @@ class NeighListAVX512 {
   }
 
   void MakePairListSIMD8x1(const Vec* q,
-                                    const int32_t particle_number) {
+                           const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
 
@@ -399,13 +397,56 @@ class NeighListAVX512 {
         }
       }
 
-      // remaining i loop
       for (int32_t l = (imesh_size / 8) * 8; l < imesh_size; l++) {
         const auto i = ptcl_id_in_mesh_[l + imesh_beg];
-        const auto qi = q[i];
-        for (int32_t k = l + 1; k < num_of_neigh_mesh; k++) {
-          const auto j = pid_of_neigh_mesh_loc[k];
-          RegistInteractPair(qi, q[j], i, j);
+        v8df vqix = _mm512_set1_pd(q[i].x);
+        v8df vqiy = _mm512_set1_pd(q[i].y);
+        v8df vqiz = _mm512_set1_pd(q[i].z);
+
+        v8di vi_id = _mm512_set1_epi64(i);
+        const auto num_loop = num_of_neigh_mesh - (l + 1);
+        for (int32_t k = 0; k < (num_loop / 8) * 8; k += 8) {
+          v8di vj_id
+            = _mm512_cvtepi32_epi64(_mm256_lddqu_si256(reinterpret_cast<const __m256i*>(&pid_of_neigh_mesh_loc[k + l + 1])));
+          v8di vindex = _mm512_slli_epi64(vj_id, 2);
+
+          v8df vqjx = _mm512_i64gather_pd(vindex, &q[0].x, 8);
+          v8df vqjy = _mm512_i64gather_pd(vindex, &q[0].y, 8);
+          v8df vqjz = _mm512_i64gather_pd(vindex, &q[0].z, 8);
+
+          v8df dvx = vqjx - vqix;
+          v8df dvy = vqjy - vqiy;
+          v8df dvz = vqjz - vqiz;
+
+          // norm
+          v8df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+
+          // dr2 <= search_length2
+          __mmask8 dr2_flag = _mm512_cmple_pd_mask(dr2, vsl2);
+
+          if (dr2_flag == 0) continue;
+
+          const int incr = _popcnt32(dr2_flag);
+
+          v8di vkey_id = _mm512_min_epi32(vi_id, vj_id);
+          v8di vpart_id = _mm512_max_epi32(vi_id, vj_id);
+          vpart_id = _mm512_slli_epi64(vpart_id, 32);
+          v8di vpart_key_id = _mm512_or_si512(vkey_id, vpart_id);
+
+          // store key and partner particle ids
+          v8di idx = _mm512_load_si512(shfl_table_[dr2_flag]);
+          vpart_key_id = _mm512_permutexvar_epi64(idx, vpart_key_id);
+
+          _mm512_storeu_si512(key_partner_particles_[number_of_pairs_],
+                              vpart_key_id);
+
+          // count number of pairs
+          number_of_pairs_ += incr;
+        }
+
+        for (int32_t k = (num_loop / 8) * 8; k < num_loop; k++) {
+          const auto j = pid_of_neigh_mesh_loc[k + l + 1];
+          RegistInteractPair(q[i], q[j], i, j);
         }
       }
     }
@@ -465,9 +506,9 @@ class NeighListAVX512 {
 
 public:
   NeighListAVX512(const double search_length,
-                const double Lx,
-                const double Ly,
-                const double Lz) {
+                  const double Lx,
+                  const double Ly,
+                  const double Lz) {
     mesh_size_[X] = static_cast<int32_t>(Lx / search_length);
     mesh_size_[Y] = static_cast<int32_t>(Ly / search_length);
     mesh_size_[Z] = static_cast<int32_t>(Lz / search_length);
@@ -503,11 +544,10 @@ public:
   }
 
   void MakeNeighList(Vec* q,
-                     Vec* p,
                      const int32_t particle_number) {
     MakeMeshidOfPtcl(q, particle_number);
     MakeNextDest(particle_number);
-    // SortPtclData(q, p, particle_number);
+    // SortPtclData(q, particle_number);
 #ifdef DEBUG
     CheckSorted(q);
 #endif

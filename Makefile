@@ -2,8 +2,10 @@ PTX = make_list.ptx
 SASS = make_list.sass
 CUBIN = make_list.cubin
 ASM = make_list_cpu_simd.s make_list_cpu_simd4x1.s
+
 CPU = make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out
-AVX2 = make_list_cpu_simd1x4.out make_list_cpu_simd4x1.out make_list_cpu_simd1x4_seq.out make_list_cpu_simd4x1_seq.out
+AVX2 = make_list_cpu_simd1x4.out make_list_cpu_simd4x1.out make_list_cpu_simd1x4_seq.out\
+	make_list_cpu_simd4x1_seq.out
 AVX512 = make_list_cpu_simd1x8.out make_list_cpu_simd8x1.out
 
 GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out\
@@ -17,7 +19,6 @@ OPT_FLAGS = -O3
 cuda_profile = no
 
 CUDA_HOME=$(CUDA_PATH)
-# CUDA_HOME=/usr/local/cuda
 
 NVCC=$(CUDA_HOME)/bin/nvcc
 NVCCFLAGS= $(OPT_FLAGS) -std=c++11 -arch=sm_35 -Xcompiler "$(WARNINGS) $(OPT_FLAGS)" -ccbin=g++
@@ -112,12 +113,3 @@ make_list_cpu_simd4x1.s: make_list.cpp
 
 clean:
 	rm -f $(PTX) $(SASS) $(CUBIN) $(ASM) $(CPU) $(AVX2) $(AVX512) $(GPU) *~ *.core
-
-gpu_bench: make_list_gpu_ref.out make_list_gpu_smem.out make_list_gpu_warp_unroll_fused_loop.out
-	./make_list_gpu_ref.out
-	./make_list_gpu_smem.out
-	./make_list_gpu_warp_unroll_fused_loop.out
-
-cpu_bench: make_list_cpu_loop_fused.out make_list_cpu_simd4x1.out
-	./make_list_cpu_loop_fused.out
-	./make_list_cpu_simd4x1.out

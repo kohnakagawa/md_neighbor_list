@@ -174,10 +174,8 @@ class NeighList {
   }
 
   void SortPtclData(Vec* __restrict q,
-                    Vec* __restrict p,
                     const int32_t particle_number) {
     Gather(q, data_buf_, particle_number, sort_buf_);
-    Gather(p, data_buf_, particle_number, sort_buf_);
     std::iota(ptcl_id_in_mesh_, ptcl_id_in_mesh_ + particle_number, 0);
   }
 
@@ -417,11 +415,10 @@ public:
   }
 
   void MakeNeighList(Vec* q,
-                     Vec* p,
                      const int32_t particle_number) {
     MakeMeshidOfPtcl(q, particle_number);
     MakeNextDest(particle_number);
-    // SortPtclData(q, p, particle_number);
+    // SortPtclData(q, particle_number);
 #ifdef DEBUG
     CheckSorted(q);
 #endif

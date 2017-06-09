@@ -17,7 +17,7 @@ typedef double Dtype;
 const Dtype density = 1.0;
 const int N = 400000; // maximum buffer size
 const int MAX_NEIGH_N = 200;
-const int LOOP = 5;
+const int LOOP = 100;
 const Dtype L = 50.0;
 
 const Dtype SEARCH_LENGTH = 3.3;
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
   nlist.Initialize(particle_number);
   const auto beg = std::chrono::system_clock::now();
   for (int i = 0; i < LOOP; i++) {
-    nlist.MakeNeighList(q, p, particle_number);
+    nlist.MakeNeighList(q, particle_number);
   }
   const auto end = std::chrono::system_clock::now();
   const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count();

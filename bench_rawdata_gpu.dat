@@ -21,8 +21,8 @@ make_list_gpu_ref.out                     803[ms]
 make_list_gpu_roc.out                     694[ms]
 make_list_gpu_smem.out                    551[ms]
 make_list_gpu_smem_mesh.out               594[ms]
-make_list_gpu_warp_unroll_fused_loop.out  525[ms]
 make_list_gpu_warp_unroll.out             642[ms]
+make_list_gpu_warp_unroll_fused_loop.out  525[ms]
 
 @ Tesla P100
 make_list_gpu_ref.out                     294[ms]
