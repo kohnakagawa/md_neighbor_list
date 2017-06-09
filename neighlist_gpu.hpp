@@ -67,8 +67,8 @@ class NeighListGPU {
   thrust::device_ptr<int32_t> ptcl_id_of_neigh_mesh_;
 
   enum : int32_t {
-    // MAX_PARTNERS = 200, // for density = 1.0
-    MAX_PARTNERS = 100, // for density = 0.5
+    MAX_PARTNERS = 200, // for density = 1.0
+    // MAX_PARTNERS = 100, // for density = 0.5
     SORT_FREQ = 50,
     WARP_SIZE = 32,
     NMAX_IN_MESH = 70,
