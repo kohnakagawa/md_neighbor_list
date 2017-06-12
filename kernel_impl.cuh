@@ -1,7 +1,5 @@
 #pragma once
 
-#include <assert.h>
-
 template <typename Vec, typename Dtype>
 __global__ void make_neighlist_naive(const Vec* q,
                                      const int32_t* particle_position,
@@ -257,6 +255,8 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
   const auto qi        = q[i_ptcl_id];
   const auto i_mesh_id = particle_position[i_ptcl_id];
   const auto lid       = lane_id();
+  const uint32_t mask   = (0xffffffff >> (31 - lid));
+
   int32_t n_neigh      = 0;
   for (int32_t cid = 0; cid < 27; cid++) {
     const auto j_mesh_id    = neigh_mesh_id[27 * i_mesh_id + cid];
@@ -272,7 +272,6 @@ __global__ void make_neighlist_warp_unroll(const Vec* __restrict__ q,
       const int32_t in_range = (dr2 <= search_length2) && (i_ptcl_id != j_ptcl_id);
       const uint32_t flag = __ballot(in_range);
       if (in_range) {
-        const uint32_t mask   = (0xffffffff >> (31 - lid));
         const int32_t str_dst = __popc(flag & mask) + n_neigh - 1;
         transposed_list_buf[i_ptcl_id * max_partners + str_dst] = j_ptcl_id;
       }
@@ -359,4 +358,79 @@ __global__ void make_neighlist_warp_unroll_loop_fused(const Vec* __restrict__ q,
   }
 
   if (lid == 0) number_of_partners[i_ptcl_id] = n_neigh;
+}
+
+struct Slot {
+  int32_t i;
+  double3 r;
+  int32_t nn;
+};
+
+// Y.-H Tang, G.E. Karniadakis / CPC 185(2014) 2809--2822
+// # of thread == warpSize * number of mesh
+template <typename Vec, typename Dtype, int MAX_PTCL_NUM_IN_NMESH>
+__global__ void make_neighlist_warp_unroll_smem(const Vec*     __restrict__ q,
+                                                const int32_t* __restrict__ particle_position,
+                                                const int32_t* __restrict__ num_of_ptcl_in_neigh_mesh,
+                                                const int32_t* __restrict__ ptcl_id_of_neigh_mesh,
+                                                const int32_t* __restrict__ mesh_index,
+                                                const int32_t* __restrict__ ptcl_id_in_mesh,
+                                                int32_t*       __restrict__ transposed_list_buf,
+                                                int32_t*       __restrict__ number_of_partners,
+                                                const Dtype search_length2,
+                                                const int32_t max_partners,
+                                                const int32_t particle_number,
+                                                const int32_t number_of_mesh) {
+  const auto i_mesh_id = (threadIdx.x + blockIdx.x * blockDim.x) / warpSize;
+
+  if (i_mesh_id >= number_of_mesh) return;
+
+  extern __shared__ Slot buffer[];
+  Slot* slots = &buffer[warpSize * warp_id()];
+
+  const auto lid        = lane_id();
+  const auto beg_imesh  = mesh_index[i_mesh_id    ];
+  const auto end_imesh  = mesh_index[i_mesh_id + 1];
+  const auto nStencil   = num_of_ptcl_in_neigh_mesh[i_mesh_id];
+  const int32_t* loc_id = &ptcl_id_of_neigh_mesh[i_mesh_id * MAX_PTCL_NUM_IN_NMESH];
+
+  int32_t i_ptcl_offset = beg_imesh;
+  while (i_ptcl_offset < end_imesh) {
+    const auto part = ((end_imesh - i_ptcl_offset) > warpSize) ? warpSize : (end_imesh - i_ptcl_offset);
+    const auto i_ptcl_id = lid + i_ptcl_offset;
+    if (lid < part) {
+      slots[lid].i = ptcl_id_in_mesh[i_ptcl_id];
+      slots[lid].r.x = q[slots[lid].i].x;
+      slots[lid].r.y = q[slots[lid].i].y;
+      slots[lid].r.z = q[slots[lid].i].z;
+      slots[lid].nn  = 0;
+    }
+
+    for (int32_t k = lid; k < nStencil; k += warpSize) {
+      const auto j_ptcl_id = loc_id[k];
+      const auto qj = q[j_ptcl_id];
+      for (int32_t i = 0; i < part; i++) {
+        const auto drx       = slots[i].r.x - qj.x;
+        const auto dry       = slots[i].r.y - qj.y;
+        const auto drz       = slots[i].r.z - qj.z;
+        const auto dr2       = drx * drx + dry * dry + drz * drz;
+        const int32_t hit    = (dr2 <= search_length2) && (slots[i].i != j_ptcl_id);
+        const uint32_t nhit  = __ballot(hit);
+        const int32_t nahead = nhit << (warpSize - lid);
+        const int32_t pins   = slots[i].nn + __popc(nahead);
+        if (hit) {
+          transposed_list_buf[slots[i].i * max_partners + pins] = j_ptcl_id;
+        }
+        if (lid == 0) {
+          slots[i].nn += __popc(nhit);
+        }
+      }
+    }
+
+    if (lid < part) {
+      number_of_partners[slots[lid].i] = slots[lid].nn;
+    }
+
+    i_ptcl_offset += warpSize;
+  }
 }

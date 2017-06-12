@@ -9,7 +9,8 @@ AVX2 = make_list_cpu_simd1x4.out make_list_cpu_simd4x1.out make_list_cpu_simd1x4
 AVX512 = make_list_cpu_simd1x8.out make_list_cpu_simd8x1.out
 
 GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out\
-	make_list_gpu_smem_mesh.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out
+	make_list_gpu_smem_mesh.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out\
+	make_list_gpu_warp_unroll_smem.out
 TARGET = $(CPU)
 
 WARNINGS = -Wall -Wextra -Werror
@@ -18,7 +19,8 @@ OPT_FLAGS = -O3
 
 cuda_profile = no
 
-CUDA_HOME=$(CUDA_PATH)
+# CUDA_HOME=$(CUDA_PATH)
+CUDA_HOME=/usr/local/cuda
 
 NVCC=$(CUDA_HOME)/bin/nvcc
 NVCCFLAGS= $(OPT_FLAGS) -std=c++11 -arch=sm_35 -Xcompiler "$(WARNINGS) $(OPT_FLAGS)" -ccbin=g++
@@ -75,8 +77,8 @@ make_list_gpu_warp_unroll.out: make_list.cu
 make_list_gpu_warp_unroll_fused_loop.out: make_list.cu
 	$(NVCC) $(NVCCFLAGS) -DUSE_MATRIX_TRANSPOSE_LOOP_FUSED $(INCLUDE) $< $(LIBRARY) -o $@
 
-make_list_gpu_warp_unroll_fused_loop_rev.out: make_list.cu
-	$(NVCC) $(NVCCFLAGS) -DUSE_MATRIX_TRANSPOSE_LOOP_FUSED_REV $(INCLUDE) $< $(LIBRARY) -o $@
+make_list_gpu_warp_unroll_smem.out: make_list.cu
+	$(NVCC) $(NVCCFLAGS) -DUSE_WARP_UNROLL_SMEM $(INCLUDE) $< $(LIBRARY) -o $@
 
 make_list_cpu_no_loop_fused.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DWITHOUT_LOOP_FUSION -xHOST -std=c++11 -ipo $< -o $@

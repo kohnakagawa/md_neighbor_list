@@ -425,6 +425,41 @@ public:
                         transposed_list_,
                         particle_number,
                         MAX_PARTNERS);
+#elif USE_WARP_UNROLL_SMEM
+    static_cast<void>(smem_hei);
+    if (is_first) {
+      checkCudaErrors(cudaFuncSetCacheConfig(make_neighlist_warp_unroll_smem<Vec, Dtype, 27 * NMAX_IN_MESH>,
+                                             cudaFuncCachePreferShared));
+      is_first = false;
+    }
+    const auto grid_size = (number_of_mesh_ - 1) / (tblock_size / 32) + 1;
+    make_ptcl_id_of_neigh_mesh<27 * NMAX_IN_MESH><<<grid_size, tblock_size>>>(particle_position_,
+                                                                              neigh_mesh_id_,
+                                                                              mesh_index_,
+                                                                              ptcl_id_in_mesh_,
+                                                                              thrust::raw_pointer_cast(num_of_ptcl_in_neigh_mesh_),
+                                                                              thrust::raw_pointer_cast(ptcl_id_of_neigh_mesh_),
+                                                                              number_of_mesh_);
+
+    const auto smem_size   = tblock_size * sizeof(Slot);
+    make_neighlist_warp_unroll_smem<Vec,
+                                    Dtype,
+                                    27 * NMAX_IN_MESH><<<grid_size, tblock_size, smem_size>>>(q,
+                                                       particle_position_,
+                                                       thrust::raw_pointer_cast(num_of_ptcl_in_neigh_mesh_),
+                                                       thrust::raw_pointer_cast(ptcl_id_of_neigh_mesh_),
+                                                       mesh_index_,
+                                                       ptcl_id_in_mesh_,
+                                                       thrust::raw_pointer_cast(transposed_list_buf_),
+                                                       number_of_partners_,
+                                                       search_length2_,
+                                                       MAX_PARTNERS,
+                                                       particle_number,
+                                                       number_of_mesh_);
+    transpose_neighlist(thrust::raw_pointer_cast(transposed_list_buf_),
+                        transposed_list_,
+                        particle_number,
+                        MAX_PARTNERS);
 #endif
 
     if (sync) checkCudaErrors(cudaDeviceSynchronize());
