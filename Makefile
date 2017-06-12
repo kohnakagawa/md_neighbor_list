@@ -19,8 +19,8 @@ OPT_FLAGS = -O3
 
 cuda_profile = no
 
-# CUDA_HOME=$(CUDA_PATH)
-CUDA_HOME=/usr/local/cuda
+CUDA_HOME=$(CUDA_PATH)
+# CUDA_HOME=/usr/local/cuda
 
 NVCC=$(CUDA_HOME)/bin/nvcc
 NVCCFLAGS= $(OPT_FLAGS) -std=c++11 -arch=sm_35 -Xcompiler "$(WARNINGS) $(OPT_FLAGS)" -ccbin=g++
