@@ -653,6 +653,139 @@ class NeighListAVX2 {
     }
   }
 
+  void MakePairListSIMD2x1(const Vec* q,
+                           const int32_t particle_number) {
+    MakeNeighMeshPtclId();
+    number_of_pairs_ = 0;
+    const v2df vsl2 = _mm_set1_pd(search_length2_);
+    for (int32_t imesh = 0; imesh < number_of_mesh_; imesh++) {
+      const auto imesh_beg = mesh_index_[imesh    ];
+      const auto imesh_end = mesh_index_[imesh + 1];
+      const auto imesh_size = imesh_end - imesh_beg;
+      const int32_t* pid_of_neigh_mesh_loc = &ptcl_id_of_neigh_mesh_[imesh][0];
+      const int32_t num_of_neigh_mesh = ptcl_id_of_neigh_mesh_[imesh].size();
+      for (int32_t l = 0; l < (imesh_size / 2) * 2 ; l += 2) {
+        const auto i_a = ptcl_id_in_mesh_[l + imesh_beg    ];
+        const auto i_b = ptcl_id_in_mesh_[l + imesh_beg + 1];
+
+        v2df vqia_yx   = _mm_load_pd(&q[i_a].x);
+        v2df vqia_wz   = _mm_load_pd(&q[i_a].z);
+        v2df vqib_yx   = _mm_load_pd(&q[i_b].x);
+        v2df vqib_wz   = _mm_load_pd(&q[i_b].z);
+
+        v2df vqix      = _mm_unpacklo_pd(vqia_yx, vqib_yx);
+        v2df vqiy      = _mm_unpackhi_pd(vqia_yx, vqib_yx);
+        v2df vqiz      = _mm_unpacklo_pd(vqia_wz, vqib_wz);
+
+        v2di vi_id   = _mm_set_epi64x(i_b, i_a);
+        for (int32_t k = l + 2; k < num_of_neigh_mesh; k++) {
+          const auto j = pid_of_neigh_mesh_loc[k];
+          v2df vqjx = _mm_set1_pd(q[j].x);
+          v2df vqjy = _mm_set1_pd(q[j].y);
+          v2df vqjz = _mm_set1_pd(q[j].z);
+
+          v2df dvx = vqjx - vqix;
+          v2df dvy = vqjy - vqiy;
+          v2df dvz = vqjz - vqiz;
+
+          // norm
+          v2df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+
+          // dr2 <= search_length2
+          v2df dr2_flag = _mm_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+
+          // get shfl hash
+          const int32_t hash = _mm_movemask_pd(dr2_flag);
+
+          if (hash == 0) continue;
+
+          const int incr = _popcnt32(hash);
+
+          // key_id < part_id
+          v2di vj_id    = _mm_set_epi64x(j, j);
+          v4si vkey_id  = _mm_min_epi32(vi_id, vj_id);
+          v4si vpart_id = _mm_max_epi32(vi_id, vj_id);
+          vpart_id = _mm_slli_si128(vpart_id, 4);
+          v4si vpart_key_id = _mm_or_si128(vkey_id, vpart_id);
+
+          // shuffle id and store pair data
+          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          vpart_key_id = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(vpart_key_id),
+                                                                            idx));
+
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(key_partner_particles_[number_of_pairs_]),
+                           vpart_key_id);
+
+          number_of_pairs_ += incr;
+        }
+        // remaining pairs
+        RegistInteractPair(q[i_a], q[i_b], i_a, i_b);
+      }
+
+      // remaining i loop
+      for (int32_t l = (imesh_size / 2) * 2; l < imesh_size; l++) {
+        const auto i = ptcl_id_in_mesh_[l + imesh_beg];
+        v2df vqix    = _mm_set1_pd(q[i].x);
+        v2df vqiy    = _mm_set1_pd(q[i].y);
+        v2df vqiz    = _mm_set1_pd(q[i].z);
+        v2di vi_id   = _mm_set1_epi64x(i);
+
+        const auto num_loop = num_of_neigh_mesh - (l + 1);
+        for (int32_t k = 0; k < (num_loop / 2) * 2; k += 2) {
+          const auto ja = pid_of_neigh_mesh_loc[k + l + 1];
+          const auto jb = pid_of_neigh_mesh_loc[k + l + 2];
+
+          v2df vqja_yx = _mm_load_pd(&q[ja].x);
+          v2df vqja_wz = _mm_load_pd(&q[ja].z);
+          v2df vqjb_yx = _mm_load_pd(&q[jb].x);
+          v2df vqjb_wz = _mm_load_pd(&q[jb].z);
+
+          v2df vqjx    = _mm_unpacklo_pd(vqja_yx, vqjb_yx);
+          v2df vqjy    = _mm_unpackhi_pd(vqja_yx, vqjb_yx);
+          v2df vqjz    = _mm_unpacklo_pd(vqja_wz, vqjb_wz);
+
+          v2df dvx = vqjx - vqix;
+          v2df dvy = vqjy - vqiy;
+          v2df dvz = vqjz - vqiz;
+
+          // norm
+          v2df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+
+          // dr2 <= search_length2
+          v2df dr2_flag = _mm_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+
+          // get shfl hash
+          const int32_t hash = _mm_movemask_pd(dr2_flag);
+
+          if (hash == 0) continue;
+
+          const int incr = _popcnt32(hash);
+
+          // key_id < part_id
+          v2di vj_id = _mm_set_epi64x(jb, ja);
+          v4si vkey_id = _mm_min_epi32(vi_id, vj_id);
+          v4si vpart_id = _mm_max_epi32(vi_id, vj_id);
+          vpart_id = _mm_slli_si128(vpart_id, 4);
+          v4si vpart_key_id = _mm_or_si128(vkey_id, vpart_id);
+
+          // shuffle id and store pair data
+          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          vpart_key_id = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(vpart_key_id),
+                                                                            idx));
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(key_partner_particles_[number_of_pairs_]),
+                           vpart_key_id);
+
+          number_of_pairs_ += incr;
+        }
+
+        for (int32_t k = (num_loop / 2) * 2; k < num_loop; k++) {
+          const auto j = pid_of_neigh_mesh_loc[k + l + 1];
+          RegistInteractPair(q[i], q[j], i, j);
+        }
+      }
+    }
+  }
+
   void MakeNeighListForEachPtcl(const int32_t particle_number) {
     std::fill(number_of_partners_,
               number_of_partners_ + particle_number,
@@ -761,6 +894,8 @@ public:
     MakePairListSIMD1x4SeqStore(q, particle_number);
 #elif SEQ_USE4x1
     MakePairListSIMD4x1SeqStore(q, particle_number);
+#elif USE2x1
+    MakePairListSIMD2x1(q, particle_number);
 #endif
     MakeNeighListForEachPtcl(particle_number);
   }

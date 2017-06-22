@@ -3,10 +3,13 @@
 #include <x86intrin.h>
 #include <iostream>
 
+typedef double v2df __attribute__((vector_size(16)));
 typedef double v4df __attribute__((vector_size(32)));
 typedef double v8df __attribute__((vector_size(64)));
+typedef int32_t v4si __attribute__((vector_size(16)));
 typedef int32_t v8si __attribute__((vector_size(32)));
 typedef int32_t v16si __attribute__((vector_size(64)));
+typedef int32_t v2di __attribute__((vector_size(16)));
 typedef int64_t v4di __attribute__((vector_size(32)));
 typedef int64_t v8di __attribute__((vector_size(64)));
 

@@ -95,6 +95,9 @@ make_list_cpu_simd1x4.out: make_list.cpp
 make_list_cpu_simd4x1.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DUSE4x1 -xHOST -std=c++11 -ipo $< -o $@
 
+make_list_cpu_simd2x1.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DUSE2x1 -xHOST -std=c++11 -ipo $< -o $@
+
 make_list_cpu_simd1x4_seq.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DSEQ_USE1x4 -xHOST -std=c++11 -ipo $< -o $@
 
