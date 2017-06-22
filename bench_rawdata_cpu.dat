@@ -7,6 +7,7 @@ make_list_cpu_simd1x4_seq.out    24800[ms]
 make_list_cpu_simd4x1_seq.out    15532[ms]
 make_list_cpu_simd1x4.out        19153[ms]
 make_list_cpu_simd4x1.out        12395[ms]
+make_list_cpu_simd2x1.out        17526[ms]
 
 @ Intel(R) Xeon Phi(TM) CPU 7250 @ 1.40GHz
 @ interactive-cache
@@ -25,6 +26,7 @@ make_list_cpu_simd1x4_seq.out     6542[ms]
 make_list_cpu_simd4x1_seq.out     4348[ms]
 make_list_cpu_simd1x4.out         5151[ms]
 make_list_cpu_simd4x1.out         3531[ms]
+make_list_cpu_simd2x1.out         4859[ms]
 
 @ Intel(R) Xeon Phi(TM) CPU 7250 @ 1.40GHz
 @ interactive-cache
