@@ -1,38 +1,37 @@
 @ density 1.0
 @ Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz
-make_list_cpu_loop_fused.out     23437[ms]
-make_list_cpu_loop_fused_swp.out 21074[ms]
-make_list_cpu_no_loop_fused.out  24420[ms]
-make_list_cpu_simd1x4_seq.out    24800[ms]
-make_list_cpu_simd4x1_seq.out    15532[ms]
-make_list_cpu_simd1x4.out        19153[ms]
-make_list_cpu_simd4x1.out        12395[ms]
-make_list_cpu_simd2x1.out        17526[ms]
+make_list_cpu_loop_fused.out     23379 [ms]
+make_list_cpu_loop_fused_swp.out 21065 [ms]
+make_list_cpu_no_loop_fused.out  24446 [ms]
+make_list_cpu_simd1x4_seq.out    24800 [ms]
+make_list_cpu_simd4x1_seq.out    15532 [ms]
+make_list_cpu_simd1x4.out        19153 [ms]
+make_list_cpu_simd4x1.out        12395 [ms]
+make_list_cpu_simd2x1.out        17526 [ms]
 
 @ Intel(R) Xeon Phi(TM) CPU 7250 @ 1.40GHz
 @ interactive-cache
-make_list_cpu_loop_fused.out     75913[ms]
-make_list_cpu_loop_fused_swp.out 73280[ms]
-make_list_cpu_no_loop_fused.out  81304[ms]
-make_list_cpu_simd1x8.out        58091[ms]
-make_list_cpu_simd8x1.out        30842[ms]
+make_list_cpu_loop_fused.out     95072 [ms]
+make_list_cpu_loop_fused_swp.out 91469 [ms]
+make_list_cpu_no_loop_fused.out  98102 [ms]
+make_list_cpu_simd1x8.out        58091 [ms]
+make_list_cpu_simd8x1.out        30842 [ms]
 
 @ density 0.5
 @ Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz
-make_list_cpu_loop_fused.out      6544[ms]
-make_list_cpu_loop_fused_swp.out  5938[ms]
-make_list_cpu_no_loop_fused.out   6595[ms]
-make_list_cpu_simd1x4_seq.out     6542[ms]
-make_list_cpu_simd4x1_seq.out     4348[ms]
-make_list_cpu_simd1x4.out         5151[ms]
-make_list_cpu_simd4x1.out         3531[ms]
-make_list_cpu_simd2x1.out         4859[ms]
+make_list_cpu_loop_fused.out      6485 [ms]
+make_list_cpu_loop_fused_swp.out  5910 [ms]
+make_list_cpu_no_loop_fused.out   6584 [ms]
+make_list_cpu_simd1x4_seq.out     6542 [ms]
+make_list_cpu_simd4x1_seq.out     4348 [ms]
+make_list_cpu_simd1x4.out         5151 [ms]
+make_list_cpu_simd4x1.out         3531 [ms]
+make_list_cpu_simd2x1.out         4859 [ms]
 
 @ Intel(R) Xeon Phi(TM) CPU 7250 @ 1.40GHz
 @ interactive-cache
-make_list_cpu_loop_fused.out     22185[ms]
-make_list_cpu_loop_fused_swp.out 21516[ms]
-make_list_cpu_no_loop_fused.out  24326[ms]
-make_list_cpu_simd1x8.out        15243[ms]
-make_list_cpu_simd8x1.out        10199[ms]
-
+make_list_cpu_loop_fused.out     22605 [ms]
+make_list_cpu_loop_fused_swp.out 21545 [ms]
+make_list_cpu_no_loop_fused.out  24818 [ms]
+make_list_cpu_simd1x8.out        15243 [ms]
+make_list_cpu_simd8x1.out        10199 [ms]

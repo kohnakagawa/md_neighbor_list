@@ -14,22 +14,22 @@ class NeighList {
 
   int32_t number_of_pairs_ = 0;
 
-  int32_t* __restrict particle_position_ = nullptr;
-  int32_t* __restrict neigh_mesh_id_ = nullptr;
-  int32_t* __restrict mesh_particle_number_ = nullptr;
-  int32_t* __restrict mesh_index_ = nullptr;
-  int32_t* __restrict mesh_index2_ = nullptr;
-  int32_t* __restrict ptcl_id_in_mesh_ = nullptr;
-  int32_t* __restrict sort_buf_ = nullptr;
+  int32_t* particle_position_ = nullptr;
+  int32_t* neigh_mesh_id_ = nullptr;
+  int32_t* mesh_particle_number_ = nullptr;
+  int32_t* mesh_index_ = nullptr;
+  int32_t* mesh_index2_ = nullptr;
+  int32_t* ptcl_id_in_mesh_ = nullptr;
+  int32_t* sort_buf_ = nullptr;
 
-  int32_t* __restrict key_particles_ = nullptr;
-  int32_t* __restrict partner_particles_ = nullptr;
-  int32_t* __restrict sorted_list_ = nullptr;
-  int32_t* __restrict number_of_partners_ = nullptr;
-  int32_t* __restrict key_pointer_ = nullptr;
-  int32_t* __restrict key_pointer2_ = nullptr;
+  int32_t* key_particles_ = nullptr;
+  int32_t* partner_particles_ = nullptr;
+  int32_t* sorted_list_ = nullptr;
+  int32_t* number_of_partners_ = nullptr;
+  int32_t* key_pointer_ = nullptr;
+  int32_t* key_pointer2_ = nullptr;
 
-  std::vector<int32_t>* __restrict ptcl_id_of_neigh_mesh_ = nullptr;
+  std::vector<int32_t>* ptcl_id_of_neigh_mesh_ = nullptr;
 
   Vec *data_buf_ = nullptr;
 
