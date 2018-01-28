@@ -377,11 +377,9 @@ class NeighListAVX512 {
           v8di vpart_key_id = _mm512_or_si512(vkey_id, vpart_id);
 
           // store key and partner particle ids
-          v8di idx = _mm512_load_si512(shfl_table_[dr2_flag]);
-          vpart_key_id = _mm512_permutexvar_epi64(idx, vpart_key_id);
-
-          _mm512_storeu_si512(key_partner_particles_[number_of_pairs_],
-                              vpart_key_id);
+          _mm512_mask_compressstoreu_epi64(key_partner_particles_[number_of_pairs_],
+                                           dr2_flag,
+                                           vpart_key_id);
 
           // count number of pairs
           number_of_pairs_ += incr;
