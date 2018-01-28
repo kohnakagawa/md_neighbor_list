@@ -6,7 +6,8 @@ ASM = make_list_cpu_simd.s make_list_cpu_simd4x1.s
 CPU = make_list_cpu_no_loop_fused.out make_list_cpu_loop_fused.out make_list_cpu_loop_fused_swp.out
 AVX2 = make_list_cpu_simd1x4.out make_list_cpu_simd4x1.out make_list_cpu_simd1x4_seq.out\
 	make_list_cpu_simd4x1_seq.out
-AVX512 = make_list_cpu_simd1x8.out make_list_cpu_simd8x1.out
+AVX512_MIC = make_list_mic_simd1x8.out make_list_mic_simd8x1.out
+AVX512_SKL = make_list_cpu_simd1x8.out make_list_cpu_simd8x1.out
 
 GPU = make_list_gpu_ref.out make_list_gpu_roc.out make_list_gpu_smem.out\
 	make_list_gpu_smem_mesh.out make_list_gpu_warp_unroll.out make_list_gpu_warp_unroll_fused_loop.out\
@@ -35,8 +36,9 @@ ICC = icpc
 
 all: $(TARGET)
 cpu: $(CPU)
-haswell: $(AVX2)
-mic: $(AVX512)
+hsw: $(AVX2)
+knl: $(AVX512_MIC)
+skl: $(AVX512_SKL)
 gpu: $(GPU)
 asm: $(ASM)
 sass: $(SASS)
@@ -104,11 +106,17 @@ make_list_cpu_simd1x4_seq.out: make_list.cpp
 make_list_cpu_simd4x1_seq.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DSEQ_USE4x1 -xHOST -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd1x8.out: make_list.cpp
+make_list_mic_simd1x8.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX512 -DUSE1x8 -xMIC-AVX512 -std=c++11 -ipo $< -o $@
 
-make_list_cpu_simd8x1.out: make_list.cpp
+make_list_mic_simd8x1.out: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX512 -DUSE8x1 -xMIC-AVX512 -std=c++11 -ipo $< -o $@
+
+make_list_cpu_simd1x8.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX512 -DUSE1x8 -xCORE-AVX512 -std=c++11 -ipo $< -o $@
+
+make_list_cpu_simd8x1.out: make_list.cpp
+	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX512 -DUSE8x1 -xCORE-AVX512 -std=c++11 -ipo $< -o $@
 
 make_list_cpu_simd.s: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
@@ -117,4 +125,4 @@ make_list_cpu_simd4x1.s: make_list.cpp
 	$(ICC) $(WARNINGS) $(OPT_FLAGS) -DUSE_AVX2 -DUSE4x1 -xHOST -std=c++11 -ipo -S -masm=intel $< -o $@
 
 clean:
-	rm -f $(PTX) $(SASS) $(CUBIN) $(ASM) $(CPU) $(AVX2) $(AVX512) $(GPU) *~ *.core
+	rm -f $(PTX) $(SASS) $(CUBIN) $(ASM) $(CPU) $(AVX2) $(AVX512_MIC) $(AVX512_SKL) $(GPU) *~ *.core

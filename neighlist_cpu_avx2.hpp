@@ -262,7 +262,7 @@ class NeighListAVX2 {
                                    const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
-    const v4df vsl2 = _mm256_set1_pd(search_length2_);
+    const auto vsl2 = _mm256_set1_pd(search_length2_);
     for (int32_t imesh = 0; imesh < number_of_mesh_; imesh++) {
       const auto imesh_beg = mesh_index_[imesh];
       const auto imesh_size = mesh_particle_number_[imesh];
@@ -270,9 +270,9 @@ class NeighListAVX2 {
       const int32_t num_of_neigh_mesh = ptcl_id_of_neigh_mesh_[imesh].size();
       for (int32_t l = 0; l < imesh_size; l++) {
         const auto i = ptcl_id_in_mesh_[l + imesh_beg];
-        v4df vqix = _mm256_set1_pd(q[i].x);
-        v4df vqiy = _mm256_set1_pd(q[i].y);
-        v4df vqiz = _mm256_set1_pd(q[i].z);
+        auto vqix = _mm256_set1_pd(q[i].x);
+        auto vqiy = _mm256_set1_pd(q[i].y);
+        auto vqiz = _mm256_set1_pd(q[i].z);
 
         const auto num_loop = num_of_neigh_mesh - (l + 1);
         for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
@@ -281,24 +281,24 @@ class NeighListAVX2 {
           const auto jc = pid_of_neigh_mesh_loc[k + l + 3];
           const auto jd = pid_of_neigh_mesh_loc[k + l + 4];
 
-          const v4df vqja = _mm256_load_pd(&q[ja].x);
-          const v4df vqjb = _mm256_load_pd(&q[jb].x);
-          const v4df vqjc = _mm256_load_pd(&q[jc].x);
-          const v4df vqjd = _mm256_load_pd(&q[jd].x);
+          const auto vqja = _mm256_load_pd(&q[ja].x);
+          const auto vqjb = _mm256_load_pd(&q[jb].x);
+          const auto vqjc = _mm256_load_pd(&q[jc].x);
+          const auto vqjd = _mm256_load_pd(&q[jd].x);
 
-          v4df vqjx, vqjy, vqjz;
+          __m256d vqjx, vqjy, vqjz;
           transpose_4x4(vqja, vqjb, vqjc, vqjd,
                         vqjx, vqjy, vqjz);
 
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
+          auto dvx = _mm256_sub_pd(vqjx, vqix);
+          auto dvy = _mm256_sub_pd(vqjy, vqiy);
+          auto dvz = _mm256_sub_pd(vqjz, vqiz);
 
           // norm
-          v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm256_fmadd_pd(dvx, dvx, _mm256_fmadd_pd(dvy, dvy, _mm256_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           int32_t hash = _mm256_movemask_pd(dr2_flag);
 
@@ -325,7 +325,7 @@ class NeighListAVX2 {
                                    const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
-    const v4df vsl2 = _mm256_set_pd(search_length2_,
+    const auto vsl2 = _mm256_set_pd(search_length2_,
                                     search_length2_,
                                     search_length2_,
                                     search_length2_);
@@ -341,29 +341,29 @@ class NeighListAVX2 {
         const auto i_c = ptcl_id_in_mesh_[l + imesh_beg + 2];
         const auto i_d = ptcl_id_in_mesh_[l + imesh_beg + 3];
 
-        v4df vqia = _mm256_load_pd(&q[i_a].x);
-        v4df vqib = _mm256_load_pd(&q[i_b].x);
-        v4df vqic = _mm256_load_pd(&q[i_c].x);
-        v4df vqid = _mm256_load_pd(&q[i_d].x);
+        auto vqia = _mm256_load_pd(&q[i_a].x);
+        auto vqib = _mm256_load_pd(&q[i_b].x);
+        auto vqic = _mm256_load_pd(&q[i_c].x);
+        auto vqid = _mm256_load_pd(&q[i_d].x);
 
-        v4df vqix, vqiy, vqiz;
+        __m256d vqix, vqiy, vqiz;
         transpose_4x4(vqia, vqib, vqic, vqid, vqix, vqiy, vqiz);
         for (int32_t k = l + 4; k < num_of_neigh_mesh; k++) {
           const auto j = pid_of_neigh_mesh_loc[k];
 
-          v4df vqjx = _mm256_set1_pd(q[j].x);
-          v4df vqjy = _mm256_set1_pd(q[j].y);
-          v4df vqjz = _mm256_set1_pd(q[j].z);
+          auto vqjx = _mm256_set1_pd(q[j].x);
+          auto vqjy = _mm256_set1_pd(q[j].y);
+          auto vqjz = _mm256_set1_pd(q[j].z);
 
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
+          auto dvx = _mm256_sub_pd(vqjx, vqix);
+          auto dvy = _mm256_sub_pd(vqjy, vqiy);
+          auto dvz = _mm256_sub_pd(vqjz, vqiz);
 
           // norm
-          v4df dr2  = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2  = _mm256_fmadd_pd(dvx, dvx, _mm256_fmadd_pd(dvy, dvy, _mm256_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           int32_t hash = _mm256_movemask_pd(dr2_flag);
 
@@ -390,9 +390,9 @@ class NeighListAVX2 {
       // remaining i loop
       for (int32_t l = (imesh_size / 4) * 4; l < imesh_size; l++) {
         const auto i = ptcl_id_in_mesh_[l + imesh_beg];
-        v4df vqix = _mm256_set1_pd(q[i].x);
-        v4df vqiy = _mm256_set1_pd(q[i].y);
-        v4df vqiz = _mm256_set1_pd(q[i].z);
+        auto vqix = _mm256_set1_pd(q[i].x);
+        auto vqiy = _mm256_set1_pd(q[i].y);
+        auto vqiz = _mm256_set1_pd(q[i].z);
 
         const auto num_loop = num_of_neigh_mesh - (l + 1);
         for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
@@ -401,24 +401,24 @@ class NeighListAVX2 {
           const auto jc = pid_of_neigh_mesh_loc[k + l + 3];
           const auto jd = pid_of_neigh_mesh_loc[k + l + 4];
 
-          const v4df vqja = _mm256_load_pd(&q[ja].x);
-          const v4df vqjb = _mm256_load_pd(&q[jb].x);
-          const v4df vqjc = _mm256_load_pd(&q[jc].x);
-          const v4df vqjd = _mm256_load_pd(&q[jd].x);
+          const auto vqja = _mm256_load_pd(&q[ja].x);
+          const auto vqjb = _mm256_load_pd(&q[jb].x);
+          const auto vqjc = _mm256_load_pd(&q[jc].x);
+          const auto vqjd = _mm256_load_pd(&q[jd].x);
 
-          v4df vqjx, vqjy, vqjz;
+          __m256d vqjx, vqjy, vqjz;
           transpose_4x4(vqja, vqjb, vqjc, vqjd,
                         vqjx, vqjy, vqjz);
 
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
+          auto dvx = _mm256_sub_pd(vqjx, vqix);
+          auto dvy = _mm256_sub_pd(vqjy, vqiy);
+          auto dvz = _mm256_sub_pd(vqjz, vqiz);
 
           // norm
-          v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm256_fmadd_pd(dvx, dvx, _mm256_fmadd_pd(dvy, dvy, _mm256_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           int32_t hash = _mm256_movemask_pd(dr2_flag);
 
@@ -445,7 +445,7 @@ class NeighListAVX2 {
                            const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
-    const v4df vsl2 = _mm256_set1_pd(search_length2_);
+    const auto vsl2 = _mm256_set1_pd(search_length2_);
     for (int32_t imesh = 0; imesh < number_of_mesh_; imesh++) {
       const auto imesh_beg = mesh_index_[imesh];
       const auto imesh_size = mesh_particle_number_[imesh];
@@ -453,10 +453,10 @@ class NeighListAVX2 {
       const int32_t num_of_neigh_mesh = ptcl_id_of_neigh_mesh_[imesh].size();
       for (int32_t l = 0; l < imesh_size; l++) {
         const auto i = ptcl_id_in_mesh_[l + imesh_beg];
-        v4df vqix = _mm256_set1_pd(q[i].x);
-        v4df vqiy = _mm256_set1_pd(q[i].y);
-        v4df vqiz = _mm256_set1_pd(q[i].z);
-        v4di vi_id = _mm256_set1_epi64x(i);
+        auto vqix = _mm256_set1_pd(q[i].x);
+        auto vqiy = _mm256_set1_pd(q[i].y);
+        auto vqiz = _mm256_set1_pd(q[i].z);
+        auto vi_id = _mm256_set1_epi64x(i);
 
         const auto num_loop = num_of_neigh_mesh - (l + 1);
         for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
@@ -465,24 +465,24 @@ class NeighListAVX2 {
           const auto jc = pid_of_neigh_mesh_loc[k + l + 3];
           const auto jd = pid_of_neigh_mesh_loc[k + l + 4];
 
-          v4df vqja = _mm256_load_pd(&q[ja].x);
-          v4df vqjb = _mm256_load_pd(&q[jb].x);
-          v4df vqjc = _mm256_load_pd(&q[jc].x);
-          v4df vqjd = _mm256_load_pd(&q[jd].x);
+          auto vqja = _mm256_load_pd(&q[ja].x);
+          auto vqjb = _mm256_load_pd(&q[jb].x);
+          auto vqjc = _mm256_load_pd(&q[jc].x);
+          auto vqjd = _mm256_load_pd(&q[jd].x);
 
-          v4df vqjx, vqjy, vqjz;
+          __m256d vqjx, vqjy, vqjz;
           transpose_4x4(vqja, vqjb, vqjc, vqjd,
                         vqjx, vqjy, vqjz);
 
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
+          auto dvx = _mm256_sub_pd(vqjx, vqix);
+          auto dvy = _mm256_sub_pd(vqjy, vqiy);
+          auto dvz = _mm256_sub_pd(vqjz, vqiz);
 
           // norm
-          v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm256_fmadd_pd(dvx, dvx, _mm256_fmadd_pd(dvy, dvy, _mm256_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           // get shfl hash
           const int32_t hash = _mm256_movemask_pd(dr2_flag);
@@ -492,14 +492,14 @@ class NeighListAVX2 {
           const int incr = _popcnt32(hash);
 
           // key_id < part_id
-          v4di vj_id = _mm256_set_epi64x(jd, jc, jb, ja);
-          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+          auto vj_id = _mm256_set_epi64x(jd, jc, jb, ja);
+          auto vkey_id = _mm256_min_epi32(vi_id, vj_id);
+          auto vpart_id = _mm256_max_epi32(vi_id, vj_id);
           vpart_id = _mm256_slli_si256(vpart_id, 4);
-          v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+          auto vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
           // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          auto idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
           vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
           _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]),
                               vpart_key_id);
@@ -519,7 +519,7 @@ class NeighListAVX2 {
                            const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
-    const v4df vsl2 = _mm256_set1_pd(search_length2_);
+    const auto vsl2 = _mm256_set1_pd(search_length2_);
     for (int32_t imesh = 0; imesh < number_of_mesh_; imesh++) {
       const auto imesh_beg = mesh_index_[imesh    ];
       const auto imesh_end = mesh_index_[imesh + 1];
@@ -532,30 +532,30 @@ class NeighListAVX2 {
         const auto i_c = ptcl_id_in_mesh_[l + imesh_beg + 2];
         const auto i_d = ptcl_id_in_mesh_[l + imesh_beg + 3];
 
-        v4df vqia = _mm256_load_pd(&q[i_a].x);
-        v4df vqib = _mm256_load_pd(&q[i_b].x);
-        v4df vqic = _mm256_load_pd(&q[i_c].x);
-        v4df vqid = _mm256_load_pd(&q[i_d].x);
+        auto vqia = _mm256_load_pd(&q[i_a].x);
+        auto vqib = _mm256_load_pd(&q[i_b].x);
+        auto vqic = _mm256_load_pd(&q[i_c].x);
+        auto vqid = _mm256_load_pd(&q[i_d].x);
 
-        v4df vqix, vqiy, vqiz;
+        __m256d vqix, vqiy, vqiz;
         transpose_4x4(vqia, vqib, vqic, vqid, vqix, vqiy, vqiz);
 
-        v4di vi_id = _mm256_set_epi64x(i_d, i_c, i_b, i_a);
+        auto vi_id = _mm256_set_epi64x(i_d, i_c, i_b, i_a);
         for (int32_t k = l + 4; k < num_of_neigh_mesh; k++) {
           const auto j = pid_of_neigh_mesh_loc[k];
-          v4df vqjx = _mm256_set1_pd(q[j].x);
-          v4df vqjy = _mm256_set1_pd(q[j].y);
-          v4df vqjz = _mm256_set1_pd(q[j].z);
+          auto vqjx = _mm256_set1_pd(q[j].x);
+          auto vqjy = _mm256_set1_pd(q[j].y);
+          auto vqjz = _mm256_set1_pd(q[j].z);
 
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
+          auto dvx = _mm256_sub_pd(vqjx, vqix);
+          auto dvy = _mm256_sub_pd(vqjy, vqiy);
+          auto dvz = _mm256_sub_pd(vqjz, vqiz);
 
           // norm
-          v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm256_fmadd_pd(dvx, dvx, _mm256_fmadd_pd(dvy, dvy, _mm256_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           // get shfl hash
           const int32_t hash = _mm256_movemask_pd(dr2_flag);
@@ -565,14 +565,14 @@ class NeighListAVX2 {
           const int incr = _popcnt32(hash);
 
           // key_id < part_id
-          v4di vj_id = _mm256_set_epi64x(j, j, j, j);
-          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+          auto vj_id = _mm256_set_epi64x(j, j, j, j);
+          auto vkey_id = _mm256_min_epi32(vi_id, vj_id);
+          auto vpart_id = _mm256_max_epi32(vi_id, vj_id);
           vpart_id = _mm256_slli_si256(vpart_id, 4);
-          v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+          auto vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
           // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          auto idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
           vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
           _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]),
                               vpart_key_id);
@@ -591,10 +591,10 @@ class NeighListAVX2 {
       // remaining i loop
       for (int32_t l = (imesh_size / 4) * 4; l < imesh_size; l++) {
         const auto i = ptcl_id_in_mesh_[l + imesh_beg];
-        v4df vqix = _mm256_set1_pd(q[i].x);
-        v4df vqiy = _mm256_set1_pd(q[i].y);
-        v4df vqiz = _mm256_set1_pd(q[i].z);
-        v4di vi_id = _mm256_set1_epi64x(i);
+        auto vqix = _mm256_set1_pd(q[i].x);
+        auto vqiy = _mm256_set1_pd(q[i].y);
+        auto vqiz = _mm256_set1_pd(q[i].z);
+        auto vi_id = _mm256_set1_epi64x(i);
 
         const auto num_loop = num_of_neigh_mesh - (l + 1);
         for (int32_t k = 0; k < (num_loop / 4) * 4; k += 4) {
@@ -603,24 +603,24 @@ class NeighListAVX2 {
           const auto jc = pid_of_neigh_mesh_loc[k + l + 3];
           const auto jd = pid_of_neigh_mesh_loc[k + l + 4];
 
-          v4df vqja = _mm256_load_pd(&q[ja].x);
-          v4df vqjb = _mm256_load_pd(&q[jb].x);
-          v4df vqjc = _mm256_load_pd(&q[jc].x);
-          v4df vqjd = _mm256_load_pd(&q[jd].x);
+          auto vqja = _mm256_load_pd(&q[ja].x);
+          auto vqjb = _mm256_load_pd(&q[jb].x);
+          auto vqjc = _mm256_load_pd(&q[jc].x);
+          auto vqjd = _mm256_load_pd(&q[jd].x);
 
-          v4df vqjx, vqjy, vqjz;
+          __m256d vqjx, vqjy, vqjz;
           transpose_4x4(vqja, vqjb, vqjc, vqjd,
                         vqjx, vqjy, vqjz);
 
-          v4df dvx = vqjx - vqix;
-          v4df dvy = vqjy - vqiy;
-          v4df dvz = vqjz - vqiz;
+          auto dvx = _mm256_sub_pd(vqjx, vqix);
+          auto dvy = _mm256_sub_pd(vqjy, vqiy);
+          auto dvz = _mm256_sub_pd(vqjz, vqiz);
 
           // norm
-          v4df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm256_fmadd_pd(dvx, dvx, _mm256_fmadd_pd(dvy, dvy, _mm256_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v4df dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm256_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           // get shfl hash
           const int32_t hash = _mm256_movemask_pd(dr2_flag);
@@ -630,14 +630,14 @@ class NeighListAVX2 {
           const int incr = _popcnt32(hash);
 
           // key_id < part_id
-          v4di vj_id = _mm256_set_epi64x(jd, jc, jb, ja);
-          v8si vkey_id = _mm256_min_epi32(vi_id, vj_id);
-          v8si vpart_id = _mm256_max_epi32(vi_id, vj_id);
+          auto vj_id = _mm256_set_epi64x(jd, jc, jb, ja);
+          auto vkey_id = _mm256_min_epi32(vi_id, vj_id);
+          auto vpart_id = _mm256_max_epi32(vi_id, vj_id);
           vpart_id = _mm256_slli_si256(vpart_id, 4);
-          v8si vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
+          auto vpart_key_id = _mm256_or_si256(vkey_id, vpart_id);
 
           // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          auto idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
           vpart_key_id = _mm256_permutevar8x32_epi32(vpart_key_id, idx);
           _mm256_storeu_si256(reinterpret_cast<__m256i*>(key_partner_particles_[number_of_pairs_]),
                               vpart_key_id);
@@ -657,7 +657,7 @@ class NeighListAVX2 {
                            const int32_t particle_number) {
     MakeNeighMeshPtclId();
     number_of_pairs_ = 0;
-    const v2df vsl2 = _mm_set1_pd(search_length2_);
+    const auto vsl2 = _mm_set1_pd(search_length2_);
     for (int32_t imesh = 0; imesh < number_of_mesh_; imesh++) {
       const auto imesh_beg = mesh_index_[imesh    ];
       const auto imesh_end = mesh_index_[imesh + 1];
@@ -668,31 +668,31 @@ class NeighListAVX2 {
         const auto i_a = ptcl_id_in_mesh_[l + imesh_beg    ];
         const auto i_b = ptcl_id_in_mesh_[l + imesh_beg + 1];
 
-        v2df vqia_yx   = _mm_load_pd(&q[i_a].x);
-        v2df vqia_wz   = _mm_load_pd(&q[i_a].z);
-        v2df vqib_yx   = _mm_load_pd(&q[i_b].x);
-        v2df vqib_wz   = _mm_load_pd(&q[i_b].z);
+        auto vqia_yx   = _mm_load_pd(&q[i_a].x);
+        auto vqia_wz   = _mm_load_pd(&q[i_a].z);
+        auto vqib_yx   = _mm_load_pd(&q[i_b].x);
+        auto vqib_wz   = _mm_load_pd(&q[i_b].z);
 
-        v2df vqix      = _mm_unpacklo_pd(vqia_yx, vqib_yx);
-        v2df vqiy      = _mm_unpackhi_pd(vqia_yx, vqib_yx);
-        v2df vqiz      = _mm_unpacklo_pd(vqia_wz, vqib_wz);
+        auto vqix      = _mm_unpacklo_pd(vqia_yx, vqib_yx);
+        auto vqiy      = _mm_unpackhi_pd(vqia_yx, vqib_yx);
+        auto vqiz      = _mm_unpacklo_pd(vqia_wz, vqib_wz);
 
-        v2di vi_id   = _mm_set_epi64x(i_b, i_a);
+        auto vi_id   = _mm_set_epi64x(i_b, i_a);
         for (int32_t k = l + 2; k < num_of_neigh_mesh; k++) {
           const auto j = pid_of_neigh_mesh_loc[k];
-          v2df vqjx = _mm_set1_pd(q[j].x);
-          v2df vqjy = _mm_set1_pd(q[j].y);
-          v2df vqjz = _mm_set1_pd(q[j].z);
+          auto vqjx = _mm_set1_pd(q[j].x);
+          auto vqjy = _mm_set1_pd(q[j].y);
+          auto vqjz = _mm_set1_pd(q[j].z);
 
-          v2df dvx = vqjx - vqix;
-          v2df dvy = vqjy - vqiy;
-          v2df dvz = vqjz - vqiz;
+          auto dvx = _mm_sub_pd(vqjx, vqix);
+          auto dvy = _mm_sub_pd(vqjy, vqiy);
+          auto dvz = _mm_sub_pd(vqjz, vqiz);
 
           // norm
-          v2df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm_fmadd_pd(dvx, dvx, _mm_fmadd_pd(dvy, dvy, _mm_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v2df dr2_flag = _mm_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           // get shfl hash
           const int32_t hash = _mm_movemask_pd(dr2_flag);
@@ -702,14 +702,14 @@ class NeighListAVX2 {
           const int incr = _popcnt32(hash);
 
           // key_id < part_id
-          v2di vj_id    = _mm_set_epi64x(j, j);
-          v4si vkey_id  = _mm_min_epi32(vi_id, vj_id);
-          v4si vpart_id = _mm_max_epi32(vi_id, vj_id);
+          auto vj_id    = _mm_set_epi64x(j, j);
+          auto vkey_id  = _mm_min_epi32(vi_id, vj_id);
+          auto vpart_id = _mm_max_epi32(vi_id, vj_id);
           vpart_id = _mm_slli_si128(vpart_id, 4);
-          v4si vpart_key_id = _mm_or_si128(vkey_id, vpart_id);
+          auto vpart_key_id = _mm_or_si128(vkey_id, vpart_id);
 
           // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          auto idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
           vpart_key_id = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(vpart_key_id),
                                                                             idx));
 
@@ -725,34 +725,34 @@ class NeighListAVX2 {
       // remaining i loop
       for (int32_t l = (imesh_size / 2) * 2; l < imesh_size; l++) {
         const auto i = ptcl_id_in_mesh_[l + imesh_beg];
-        v2df vqix    = _mm_set1_pd(q[i].x);
-        v2df vqiy    = _mm_set1_pd(q[i].y);
-        v2df vqiz    = _mm_set1_pd(q[i].z);
-        v2di vi_id   = _mm_set1_epi64x(i);
+        auto vqix    = _mm_set1_pd(q[i].x);
+        auto vqiy    = _mm_set1_pd(q[i].y);
+        auto vqiz    = _mm_set1_pd(q[i].z);
+        auto vi_id   = _mm_set1_epi64x(i);
 
         const auto num_loop = num_of_neigh_mesh - (l + 1);
         for (int32_t k = 0; k < (num_loop / 2) * 2; k += 2) {
           const auto ja = pid_of_neigh_mesh_loc[k + l + 1];
           const auto jb = pid_of_neigh_mesh_loc[k + l + 2];
 
-          v2df vqja_yx = _mm_load_pd(&q[ja].x);
-          v2df vqja_wz = _mm_load_pd(&q[ja].z);
-          v2df vqjb_yx = _mm_load_pd(&q[jb].x);
-          v2df vqjb_wz = _mm_load_pd(&q[jb].z);
+          auto vqja_yx = _mm_load_pd(&q[ja].x);
+          auto vqja_wz = _mm_load_pd(&q[ja].z);
+          auto vqjb_yx = _mm_load_pd(&q[jb].x);
+          auto vqjb_wz = _mm_load_pd(&q[jb].z);
 
-          v2df vqjx    = _mm_unpacklo_pd(vqja_yx, vqjb_yx);
-          v2df vqjy    = _mm_unpackhi_pd(vqja_yx, vqjb_yx);
-          v2df vqjz    = _mm_unpacklo_pd(vqja_wz, vqjb_wz);
+          auto vqjx    = _mm_unpacklo_pd(vqja_yx, vqjb_yx);
+          auto vqjy    = _mm_unpackhi_pd(vqja_yx, vqjb_yx);
+          auto vqjz    = _mm_unpacklo_pd(vqja_wz, vqjb_wz);
 
-          v2df dvx = vqjx - vqix;
-          v2df dvy = vqjy - vqiy;
-          v2df dvz = vqjz - vqiz;
+          auto dvx = _mm_sub_pd(vqjx, vqix);
+          auto dvy = _mm_sub_pd(vqjy, vqiy);
+          auto dvz = _mm_sub_pd(vqjz, vqiz);
 
           // norm
-          v2df dr2 = dvx * dvx + dvy * dvy + dvz * dvz;
+          auto dr2 = _mm_fmadd_pd(dvx, dvx, _mm_fmadd_pd(dvy, dvy, _mm_mul_pd(dvz, dvz)));
 
           // dr2 <= search_length2
-          v2df dr2_flag = _mm_cmp_pd(dr2, vsl2, _CMP_LE_OS);
+          auto dr2_flag = _mm_cmp_pd(dr2, vsl2, _CMP_LE_OS);
 
           // get shfl hash
           const int32_t hash = _mm_movemask_pd(dr2_flag);
@@ -762,14 +762,14 @@ class NeighListAVX2 {
           const int incr = _popcnt32(hash);
 
           // key_id < part_id
-          v2di vj_id = _mm_set_epi64x(jb, ja);
-          v4si vkey_id = _mm_min_epi32(vi_id, vj_id);
-          v4si vpart_id = _mm_max_epi32(vi_id, vj_id);
+          auto vj_id = _mm_set_epi64x(jb, ja);
+          auto vkey_id = _mm_min_epi32(vi_id, vj_id);
+          auto vpart_id = _mm_max_epi32(vi_id, vj_id);
           vpart_id = _mm_slli_si128(vpart_id, 4);
-          v4si vpart_key_id = _mm_or_si128(vkey_id, vpart_id);
+          auto vpart_key_id = _mm_or_si128(vkey_id, vpart_id);
 
           // shuffle id and store pair data
-          v8si idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
+          auto idx = _mm256_load_si256(reinterpret_cast<const __m256i*>(shfl_table_[hash]));
           vpart_key_id = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(vpart_key_id),
                                                                             idx));
           _mm_storeu_si128(reinterpret_cast<__m128i*>(key_partner_particles_[number_of_pairs_]),
